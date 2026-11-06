@@ -13,7 +13,7 @@ import { SaysStep } from './steps/SaysStep';
 import { BuildStep } from './steps/BuildStep';
 import { FillStep } from './steps/FillStep';
 import { ReadStep } from './steps/ReadStep';
-import { WarmupStep } from './steps/WarmupStep';
+import { MixupStep } from './steps/MixupStep';
 
 export function UnitScreen({ unitId }: { unitId: string }) {
   const { data, update } = useGame();
@@ -62,13 +62,14 @@ export function UnitScreen({ unitId }: { unitId: string }) {
     case 'read':
       body = <ReadStep key={step.id} stepId={step.id} titleHe={step.titleHe} lines={step.lines} questions={step.questions} onDone={next} />;
       break;
-    case 'warmup':
+    case 'mixup':
       body = (
-        <WarmupStep
+        <MixupStep
           key={step.id}
           unit={unit}
           stepId={step.id}
-          level={level}
+          rounds={step.rounds}
+          opening={!!step.opening}
           onDone={(skip) => {
             update((d) => ({ ...d, game: markStepsDone(advanceStep(d.game, unit.id, step.id, now()), unit.id, skip) }));
             window.scrollTo({ top: 0 });

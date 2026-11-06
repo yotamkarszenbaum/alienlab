@@ -14,6 +14,7 @@ export const WORDS: WordDef[] = [
   // ------------------------------ Unit 1 ---------------------------------
   {
     id: 'apple',
+    kosmoSpelling: 'EPEL',
     english: 'APPLE',
     hebrew: 'תפוח',
     sayItHe: 'אֶפֶּל',
@@ -30,6 +31,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'ball',
+    kosmoSpelling: 'BOL',
     english: 'BALL',
     hebrew: 'כדור',
     sayItHe: 'בּוֹל',
@@ -46,6 +48,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'cat',
+    kosmoSpelling: 'KAT',
     english: 'CAT',
     hebrew: 'חתול',
     sayItHe: 'קֶט',
@@ -62,6 +65,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'dog',
+    kosmoSpelling: 'DOGG',
     english: 'DOG',
     hebrew: 'כלב',
     sayItHe: 'דוֹג',
@@ -87,6 +91,7 @@ export const WORDS: WordDef[] = [
   // ---- Unit 1 extra words (higher levels) ----
   {
     id: 'car',
+    example: { en: 'I HAVE A RED CAR.', he: 'יש לי מכונית אדומה.', picture: item('car', 'red') },
     english: 'CAR',
     hebrew: 'מכונית',
     minLevel: 2,
@@ -104,6 +109,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'hat',
+    example: { en: 'MY HAT IS BLUE.', he: 'הכובע שלי כחול.', picture: item('hat', 'blue') },
     english: 'HAT',
     hebrew: 'כובע',
     minLevel: 2,
@@ -121,6 +127,8 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'cup',
+    example: { en: 'MY CUP IS YELLOW.', he: 'הכוס שלי צהובה.', picture: item('cup', 'yellow') },
+    kosmoSpelling: 'KAP',
     english: 'CUP',
     hebrew: 'כוס',
     minLevel: 3,
@@ -140,6 +148,7 @@ export const WORDS: WordDef[] = [
   // ------------------------------ Unit 2 ---------------------------------
   {
     id: 'red',
+    kosmoSpelling: 'RAD',
     english: 'RED',
     hebrew: 'אדום',
     sayItHe: 'רֶד',
@@ -195,6 +204,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'big',
+    kosmoSpelling: 'BEEG',
     english: 'BIG',
     hebrew: 'גדול',
     sayItHe: 'בִּיג',
@@ -227,6 +237,8 @@ export const WORDS: WordDef[] = [
   // ---- Unit 2 extra words (higher levels) ----
   {
     id: 'green',
+    example: { en: 'THE APPLE IS GREEN.', he: 'התפוח ירוק.', picture: item('apple', 'green') },
+    kosmoSpelling: 'GRIN',
     english: 'GREEN',
     hebrew: 'ירוק',
     minLevel: 2,
@@ -251,6 +263,8 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'small',
+    example: { en: 'I HAVE A SMALL DOG.', he: 'יש לי כלב קטן.', picture: item('dog', 'brown', 'small') },
+    kosmoSpelling: 'SMOL',
     english: 'SMALL',
     hebrew: 'קטן',
     minLevel: 2,
@@ -270,6 +284,7 @@ export const WORDS: WordDef[] = [
   // ---- Unit 2, level 3: numbers (plurals) ----
   {
     id: 'two',
+    example: { en: 'I SEE TWO CATS.', he: 'אני רואה שני חתולים.', picture: items(2, 'cat', 'orange') },
     english: 'TWO',
     hebrew: 'שתיים',
     minLevel: 3,
@@ -287,6 +302,8 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'three',
+    example: { en: 'I HAVE THREE RED BALLS.', he: 'יש לי שלושה כדורים אדומים.', picture: items(3, 'ball', 'red') },
+    kosmoSpelling: 'TRI',
     english: 'THREE',
     hebrew: 'שלוש',
     minLevel: 3,
@@ -306,6 +323,7 @@ export const WORDS: WordDef[] = [
   // ------------------------------ Unit 3 ---------------------------------
   {
     id: 'key',
+    kosmoSpelling: 'KI',
     english: 'KEY',
     hebrew: 'מפתח',
     sayItHe: 'קִי',
@@ -322,6 +340,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'door',
+    kosmoSpelling: 'DOR',
     english: 'DOOR',
     hebrew: 'דלת',
     sayItHe: 'דוֹר',
@@ -338,6 +357,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'open',
+    kosmoSpelling: 'OUPEN',
     english: 'OPEN',
     hebrew: 'לפתוח',
     sayItHe: 'אוֹפֶּן',
@@ -418,6 +438,8 @@ export const WORDS: WordDef[] = [
   // ---- Unit 3 extra words (higher levels) ----
   {
     id: 'box',
+    example: { en: 'THE BOX IS OPEN.', he: 'הקופסה פתוחה.', picture: item('box', 'blue', 'normal', 'open') },
+    kosmoSpelling: 'BOKS',
     english: 'BOX',
     hebrew: 'קופסה',
     minLevel: 2,
@@ -435,6 +457,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'star',
+    example: { en: 'I SEE A BIG YELLOW STAR.', he: 'אני רואה כוכב צהוב גדול.', picture: item('star', 'yellow', 'big') },
     english: 'STAR',
     hebrew: 'כוכב',
     minLevel: 2,
@@ -454,6 +477,8 @@ export const WORDS: WordDef[] = [
   // ---- Unit 3, level 3: a table and where things are (IN / ON / UNDER) ----
   {
     id: 'table',
+    example: { en: 'THE TABLE IS BIG.', he: 'השולחן גדול.', picture: item('table', 'brown', 'big') },
+    kosmoSpelling: 'TEIBEL',
     english: 'TABLE',
     hebrew: 'שולחן',
     minLevel: 3,
@@ -471,6 +496,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'on',
+    example: { en: 'THE CAT IS ON THE TABLE.', he: 'החתול על השולחן.', picture: placed('cat', 'orange', 'on') },
     english: 'ON',
     hebrew: 'על',
     minLevel: 3,
@@ -488,6 +514,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'under',
+    example: { en: 'THE DOG IS UNDER THE TABLE.', he: 'הכלב מתחת לשולחן.', picture: placed('dog', 'white', 'under') },
     english: 'UNDER',
     hebrew: 'מתחת',
     minLevel: 3,
@@ -519,6 +546,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'in',
+    example: { en: 'THE KEY IS IN THE BOX.', he: 'המפתח בתוך הקופסה.', picture: placed('key', 'yellow', 'in') },
     english: 'IN',
     hebrew: 'בתוך',
     minLevel: 3,

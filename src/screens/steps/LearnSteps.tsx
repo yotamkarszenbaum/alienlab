@@ -5,6 +5,7 @@ import { AlienStage, BigButton, EnglishWord, SpeakButton } from '../../component
 import { IconArrowLeft, IconRefresh } from '../../components/Icons';
 import { useGame, now } from '../../state/GameContext';
 import { introduceWord } from '../../engine/session';
+import { levelOfGame } from '../../engine/gameProgress';
 import { getWord } from '../../content/words';
 import { SENTENCES_BY_ID } from '../../content/units';
 import { useSpeechStatus } from '../../audio/speech';
@@ -68,9 +69,10 @@ export function DiscoverStep({ wordId, onDone }: { wordId: string; onDone: () =>
     update((d) => introduceWord(d, wordId, now()));
   }, [wordId, update]);
   const alienReads = data.settings.readAloudHe && heStatus !== 'unavailable';
+  const example = levelOfGame(data.game) >= 2 ? word.example : undefined;
   return (
     <div className="flex flex-col gap-4" data-testid="discover-step" data-word={word.id}>
-      <AlienStage mood="discovery" text={word.discoverLineHe} />
+      <AlienStage mood="discovery" text={example ? `${word.discoverLineHe} ומיד אשתמש בה במשפט!` : word.discoverLineHe} />
       <div className="card p-4 sm:p-6 flex flex-col items-center gap-3 text-center">
         <DiscoverVisual v={word.illustration} replayKey={replay} />
         {word.illustration.type === 'transition' && (
@@ -89,6 +91,21 @@ export function DiscoverStep({ wordId, onDone }: { wordId: string; onDone: () =>
           אומרים: <b className="text-ink">{word.sayItHe}</b>
         </p>
       </div>
+      {example && (
+        <div className="card p-4 flex items-center gap-4 flex-wrap justify-center text-center anim-fade" data-testid="discover-example">
+          <ItemArt item={example.picture} size="clamp(80px, 18vw, 110px)" />
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-base font-bold text-ink-soft">קוסמו במשפט:</span>
+            <span className="flex items-center gap-3 flex-wrap justify-center">
+              <bdi dir="ltr" lang="en" className="en text-[clamp(1.4rem,5vw,2rem)] text-primary-dark">
+                {example.en}
+              </bdi>
+              <SpeakButton text={example.en} size="sm" label="השמעת המשפט באנגלית" />
+            </span>
+            <span className="text-xl font-bold">{example.he}</span>
+          </div>
+        </div>
+      )}
       <div className="flex justify-end">
         <BigButton onClick={onDone} testId="next-btn">
           הבנתי, נמשיך <IconArrowLeft size={24} />

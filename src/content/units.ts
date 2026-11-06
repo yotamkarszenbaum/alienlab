@@ -2,6 +2,7 @@ import type { Level, MissionDef, SentenceDef, StepDef, UnitDef } from '../engine
 import { inLevel, inRange } from './levels';
 import { item, items, placed } from './items';
 import { WORDS_BY_ID } from './words';
+import { COLORS_OPENING, COLORS_REVIEW, EARTH_OPENING, EARTH_REVIEW, LAB_OPENING, LAB_REVIEW } from './mixups';
 
 // ---------------------------------------------------------------------------
 // Units, step sequences, sentences and missions. All data-driven: the step
@@ -26,7 +27,7 @@ export const UNITS: UnitDef[] = [
     wordIds: ['apple', 'ball', 'cat', 'dog', 'car', 'hat', 'cup'],
     unlocksUnitId: 'colors',
     steps: [
-      { id: 'earth-warmup', type: 'warmup', minLevel: 2 },
+      { id: 'earth-mixup', type: 'mixup', opening: true, minLevel: 2, rounds: EARTH_OPENING },
       ...wordSteps('apple'),
       ...wordSteps('ball'),
       ...wordSteps('cat'),
@@ -37,6 +38,7 @@ export const UNITS: UnitDef[] = [
       {
         id: 'earth-mix',
         type: 'practice',
+        maxLevel: 1,
         titleHe: 'סבב תרגול קצר',
         questions: [
           { id: 'earth-mix-1', mode: 'picture_to_word', wordId: 'cat' },
@@ -46,6 +48,7 @@ export const UNITS: UnitDef[] = [
           { id: 'earth-mix-5', mode: 'word_to_picture', wordId: 'hat', minLevel: 2 },
         ],
       },
+      { id: 'earth-kosmo', type: 'mixup', minLevel: 2, rounds: EARTH_REVIEW },
       {
         id: 'earth-says',
         type: 'says',
@@ -84,7 +87,7 @@ export const UNITS: UnitDef[] = [
     wordIds: ['red', 'blue', 'yellow', 'big', 'green', 'small', 'two', 'three'],
     unlocksUnitId: 'lab',
     steps: [
-      { id: 'colors-warmup', type: 'warmup', minLevel: 2 },
+      { id: 'colors-mixup', type: 'mixup', opening: true, minLevel: 2, rounds: COLORS_OPENING },
       ...wordSteps('red'),
       ...wordSteps('blue'),
       ...wordSteps('yellow'),
@@ -96,6 +99,7 @@ export const UNITS: UnitDef[] = [
       {
         id: 'colors-mix',
         type: 'practice',
+        maxLevel: 1,
         titleHe: 'סבב תרגול קצר',
         questions: [
           { id: 'colors-mix-1', mode: 'word_to_picture', wordId: 'yellow' },
@@ -106,6 +110,7 @@ export const UNITS: UnitDef[] = [
           { id: 'colors-mix-6', mode: 'word_to_picture', wordId: 'three', minLevel: 3 },
         ],
       },
+      { id: 'colors-kosmo', type: 'mixup', minLevel: 2, rounds: COLORS_REVIEW },
       {
         id: 'colors-says',
         type: 'says',
@@ -160,7 +165,7 @@ export const UNITS: UnitDef[] = [
     accent: '#ff8a3d',
     wordIds: ['key', 'door', 'open', 'close', 'box', 'star', 'table', 'on', 'under', 'in'],
     steps: [
-      { id: 'lab-warmup', type: 'warmup', minLevel: 2 },
+      { id: 'lab-mixup', type: 'mixup', opening: true, minLevel: 2, rounds: LAB_OPENING },
       ...wordSteps('key'),
       ...wordSteps('door'),
       ...wordSteps('open'),
@@ -174,12 +179,14 @@ export const UNITS: UnitDef[] = [
       {
         id: 'sentence-open-door',
         type: 'sentence',
+        maxLevel: 1,
         sentenceId: 'open-the-door',
         questions: [
           { id: 'sentence-q1', mode: 'sentence_to_picture', sentenceId: 'close-the-door' },
           { id: 'sentence-q2', mode: 'sentence_to_picture', sentenceId: 'open-the-door' },
         ],
       },
+      { id: 'lab-kosmo', type: 'mixup', minLevel: 2, rounds: LAB_REVIEW },
       {
         id: 'lab-says',
         type: 'says',

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MISSIONS_BY_ID, SENTENCES_BY_ID, UNITS, UNITS_BY_ID, stepsFor, unitWordIds } from '../src/content/units';
 import { WORDS, WORDS_BY_ID, wordsForLevel } from '../src/content/words';
-import { inLevel } from '../src/content/levels';
+import { inLevel, inRange } from '../src/content/levels';
 import { advanceStep, emptyGame, hasNewSteps, completeUnit, markStepsDone, setLevel, stepIndexOf, visibleSteps } from '../src/engine/gameProgress';
 import { initialSupport, onHelp } from '../src/engine/hints';
 import { introduceWord, recordWordAttempt } from '../src/engine/session';
@@ -152,35 +152,151 @@ describe('levels — content', () => {
   });
 });
 
-describe('levels — warm-up for older children', () => {
-  it('levels 2–3 start every station with a warm-up; level 1 does not', () => {
+/** Game word behind an English token (plural-aware: BALLS → ball, BOXES → box). */
+const gameWord = (t: string) => WORDS.find((w) => t === w.english || t === `${w.english}S` || t === `${w.english}ES`);
+const tokensOf = (sentence: string) => sentence.replace(/[.!?,]/g, '').split(/\s+/).filter(Boolean);
+
+describe('levels — "Kosmo gets confused" (levels 2–3)', () => {
+  it('levels 2–3 open every station with Kosmo\'s mix-ups; level 1 does not', () => {
     for (const u of UNITS) {
       expect(stepsFor(u, 1)[0].type).toBe('discover');
-      expect(stepsFor(u, 2)[0].type).toBe('warmup');
-      expect(stepsFor(u, 3)[0].type).toBe('warmup');
+      for (const l of [2, 3] as Level[]) {
+        const first = stepsFor(u, l)[0];
+        expect(first.type).toBe('mixup');
+        expect((first as { opening?: boolean }).opening).toBe(true);
+      }
     }
   });
-  it('known words skip their introduction; unknown ones are taught', () => {
-    let g = setLevel(emptyGame(), 3);
-    const earth = UNITS_BY_ID.earth;
-    g = advanceStep(g, 'earth', 'earth-warmup', T0);
-    const known = ['apple', 'ball', 'dog', 'car', 'hat']; // CAT marked "not learned yet"
-    g = markStepsDone(g, 'earth', known.flatMap((w) => [`${w}-discover`, `${w}-practice`]));
-    expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('cat-discover');
-    g = advanceStep(g, 'earth', 'cat-discover', T0);
-    g = advanceStep(g, 'earth', 'cat-practice', T0);
-    expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('cup-discover'); // the level-3 word is always taught
+
+  it('the simple mixed rounds are replaced by a Kosmo review at levels 2–3', () => {
+    const ids = (l: Level) => UNITS.flatMap((u) => stepsFor(u, l).map((s) => s.id));
+    expect(ids(1)).toEqual(expect.arrayContaining(['earth-mix', 'colors-mix', 'sentence-open-door']));
+    for (const l of [2, 3] as Level[]) {
+      expect(ids(l)).not.toEqual(expect.arrayContaining(['earth-mix']));
+      expect(ids(l).filter((x) => ['earth-mix', 'colors-mix', 'sentence-open-door'].includes(x))).toEqual([]);
+      expect(ids(l)).toEqual(expect.arrayContaining(['earth-kosmo', 'colors-kosmo', 'lab-kosmo']));
+    }
+    expect(ids(1).some((x) => x.endsWith('-kosmo') || x.endsWith('-mixup'))).toBe(false);
   });
-  it('a warm-up never counts as a "new activity" badge', () => {
+
+  it('every round is consistent: the wrong word does not fit the picture, the fix does, other choices do not', () => {
+    for (const u of UNITS)
+      for (const s of u.steps)
+        if (s.type === 'mixup')
+          for (const r of s.rounds) {
+            const tag = `${s.id}/${r.id}`;
+            const wrong = r.wrongAt !== undefined;
+            expect(wrong, `${tag}: fix and choices go with a wrong word`).toBe(!!r.fix && !!r.choices);
+            r.tokens.forEach((t, i) => {
+              const w = gameWord(t);
+              if (!w) return;
+              expect(shows(r.picture, w.id), `${tag}: "${t}" ${i === r.wrongAt ? 'must not' : 'must'} fit the picture`).toBe(i !== r.wrongAt);
+            });
+            if (wrong) {
+              expect(r.wrongAt! < r.tokens.length).toBe(true);
+              expect(r.choices).toContain(r.fix);
+              expect(r.choices).not.toContain(r.tokens[r.wrongAt!]);
+              expect(new Set(r.choices).size).toBe(r.choices!.length);
+              expect(r.choices!.length).toBeGreaterThanOrEqual(2);
+              for (const c of r.choices!) {
+                const w = gameWord(c);
+                if (w) expect(shows(r.picture, w.id), `${tag}: choice ${c}`).toBe(c === r.fix);
+              }
+            }
+            for (const w of r.wordIds) expect(u.wordIds, `${tag}: ${w} is a word of this station`).toContain(w);
+            if (r.pictureFrom) expect(r.pictureFrom.state).not.toBe(r.picture.state);
+          }
+  });
+
+  it('Kosmo only uses words the child already knows at that level', () => {
+    for (const level of [2, 3] as Level[])
+      for (const u of UNITS) {
+        const seen = new Set<string>(UNITS.filter((p) => p.order < u.order).flatMap((p) => unitWordIds(p, level)));
+        const known = (w: string) => seen.has(w) || (WORDS_BY_ID[w].minLevel ?? 1) < level;
+        for (const s of stepsFor(u, level)) {
+          if (s.type === 'discover') {
+            seen.add(s.wordId);
+            const ex = WORDS_BY_ID[s.wordId].example;
+            if (ex) {
+              expect(shows(ex.picture, s.wordId), `${s.wordId}: example picture`).toBe(true);
+              for (const t of tokensOf(ex.en)) {
+                const w = gameWord(t);
+                if (w && w.id !== s.wordId) expect(known(w.id), `${s.wordId} example uses ${w.id} (level ${level})`).toBe(true);
+              }
+            }
+          }
+          if (s.type !== 'mixup') continue;
+          for (const r of s.rounds.filter((r) => inRange(r.minLevel, r.maxLevel, level)))
+            for (const t of [...r.tokens, ...(r.choices ?? [])]) {
+              const w = gameWord(t);
+              if (w) expect(known(w.id), `${s.id}/${r.id} uses ${w.id} (level ${level})`).toBe(true);
+            }
+        }
+      }
+  });
+
+  it('the opening covers every basic word of the station, with a mix of right and wrong rounds', () => {
+    for (const level of [2, 3] as Level[])
+      for (const u of UNITS) {
+        const opening = stepsFor(u, level)[0] as { rounds: import('../src/engine/types').MixupRoundDef[] };
+        const rounds = opening.rounds.filter((r) => inRange(r.minLevel, r.maxLevel, level));
+        const basics = unitWordIds(u, level).filter((w) => (WORDS_BY_ID[w].minLevel ?? 1) < level);
+        for (const w of basics) expect(rounds.some((r) => r.wordIds.includes(w)), `${u.id} level ${level}: ${w}`).toBe(true);
+        expect(rounds.some((r) => r.wrongAt === undefined), `${u.id} L${level}: a round where Kosmo is right`).toBe(true);
+        expect(rounds.filter((r) => r.wrongAt !== undefined).length).toBeGreaterThanOrEqual(2);
+      }
+  });
+
+  it('level 3 sentences are longer than level 2 ones', () => {
+    const avg = (l: Level) => {
+      const rs = UNITS.flatMap((u) => stepsFor(u, l)).flatMap((s) => (s.type === 'mixup' ? s.rounds.filter((r) => inRange(r.minLevel, r.maxLevel, l)) : []));
+      return rs.reduce((n, r) => n + r.tokens.length, 0) / rs.length;
+    };
+    expect(avg(3)).toBeGreaterThan(avg(2));
+  });
+
+  it('words handled alone skip their introduction; the others skip only the introduction screen', () => {
+    let g = setLevel(emptyGame(), 2);
+    const earth = UNITS_BY_ID.earth;
+    expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('earth-mixup');
+    g = advanceStep(g, 'earth', 'earth-mixup', T0);
+    // APPLE, BALL, DOG handled alone; CAT needed help
+    g = markStepsDone(g, 'earth', [...['apple', 'ball', 'dog'].flatMap((w) => [`${w}-discover`, `${w}-practice`]), 'cat-discover']);
+    expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('cat-practice');
+    g = advanceStep(g, 'earth', 'cat-practice', T0);
+    expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('car-discover'); // the new words of the level are always taught
+  });
+
+  it('the opening never counts as a "new activity" badge, the review does', () => {
     let g = setLevel(emptyGame(), 1);
     const earth = UNITS_BY_ID.earth;
     for (const s of visibleSteps(g, earth)) g = advanceStep(g, 'earth', s.id, T0);
     g = completeUnit(g, 'earth', T0).game;
     g = setLevel(g, 2);
-    // new level-2 words are new activities, the warm-up itself is not
     expect(hasNewSteps(g, earth)).toBe(true);
-    g = markStepsDone(g, 'earth', visibleSteps(g, earth).filter((s) => s.type !== 'warmup').map((s) => s.id));
-    expect(hasNewSteps(g, earth)).toBe(false);
+    g = markStepsDone(g, 'earth', visibleSteps(g, earth).filter((s) => s.id !== 'earth-kosmo' && s.id !== 'earth-mixup').map((s) => s.id));
+    expect(hasNewSteps(g, earth)).toBe(true); // the Kosmo review is new
+    g = markStepsDone(g, 'earth', ['earth-kosmo']);
+    expect(hasNewSteps(g, earth)).toBe(false); // the opening alone is not
+  });
+
+  it('in spelling, Kosmo first writes every word "by its sound" — wrongly', () => {
+    for (const u of UNITS)
+      for (const s of u.steps)
+        if (s.type === 'spell')
+          for (const w of [...s.wordIds, ...(s.wordIdsL3 ?? [])]) {
+            const k = WORDS_BY_ID[w].kosmoSpelling;
+            expect(k, w).toBeTruthy();
+            expect(k).not.toBe(WORDS_BY_ID[w].english);
+            expect(k).toMatch(/^[A-Z]+$/);
+          }
+  });
+
+  it('every new word of levels 2–3 has an example sentence that contains it', () => {
+    for (const w of WORDS.filter((x) => (x.minLevel ?? 1) >= 2)) {
+      expect(w.example, w.id).toBeTruthy();
+      expect(tokensOf(w.example!.en).some((t) => gameWord(t)?.id === w.id), `${w.id} in "${w.example!.en}"`).toBe(true);
+    }
   });
 });
 
@@ -193,9 +309,9 @@ describe('levels — progress', () => {
     expect(hasNewSteps(g, earth)).toBe(false);
     g = setLevel(g, 3);
     expect(hasNewSteps(g, earth)).toBe(true);
-    // the warm-up opens the station (it skips itself on screen when every older word is already known)
-    expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('earth-warmup');
-    g = advanceStep(g, 'earth', 'earth-warmup', T0);
+    // Kosmo's mix-ups open the station (they skip themselves on screen when every older word is already known)
+    expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('earth-mixup');
+    g = advanceStep(g, 'earth', 'earth-mixup', T0);
     expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('car-discover');
     expect(g.completedUnits).toContain('earth'); // nothing taken away
     // lowering again hides them

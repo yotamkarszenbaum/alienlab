@@ -24,7 +24,7 @@ function FillSentence({ def, taskId, onComplete, continueLabel }: { def: FillDef
   const [wrong, setWrong] = useState<string[]>([]);
   const [done, setDone] = useState(false);
   const [mood, setMood] = useState<AlienMood>('curious');
-  const [line, setLine] = useState('חסרה מילה במשפט! איזו מילה משלימה אותו?');
+  const [line, setLine] = useState('אוי, שכחתי מילה באמצע המשפט שלי! 😅 איזו מילה חסרה?');
   const busy = useRef(false);
 
   // Level 2 support: drop wrong chips so two remain; level 3: highlight the answer.

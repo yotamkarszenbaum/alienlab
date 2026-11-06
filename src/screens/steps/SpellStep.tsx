@@ -43,7 +43,11 @@ function SpellWord({ word, taskId, onComplete, continueLabel }: { word: WordDef;
   const [done, setDone] = useState(false);
   const [shake, setShake] = useState(false);
   const [mood, setMood] = useState<AlienMood>('curious');
-  const [line, setLine] = useState(`אני רוצה לכתוב "${word.hebrew}" באנגלית. תעזרו לי להרכיב את המילה מהאותיות?`);
+  const [line, setLine] = useState(
+    word.kosmoSpelling
+      ? `ניסיתי לכתוב "${word.hebrew}" באנגלית, וכתבתי ${word.kosmoSpelling} — כמו שזה נשמע לי. אבל זה לא נכון! 😅 תעזרו לי להרכיב את המילה כמו שצריך?`
+      : `אני רוצה לכתוב "${word.hebrew}" באנגלית. תעזרו לי להרכיב את המילה מהאותיות?`,
+  );
   const busy = useRef(false);
 
   const tileById = (id: string | null) => tiles.find((t) => t.id === id);
@@ -76,7 +80,13 @@ function SpellWord({ word, taskId, onComplete, continueLabel }: { word: WordDef;
       playSfx('correct');
       setDone(true);
       setMood('success');
-      setLine(support.used.length ? `יפה מאוד! ${word.english} — ${word.hebrew}. הרכבתם בעזרת רמז.` : `מדהים! הרכבתם לבד: ${word.english} — ${word.hebrew}!`);
+      setLine(
+        support.used.length
+          ? `יפה מאוד! ${word.english} — ${word.hebrew}. הרכבתם בעזרת רמז.`
+          : word.kosmoSpelling
+            ? `מדהים! כותבים ${word.english} ולא ${word.kosmoSpelling}. עכשיו גם אני יודע!`
+            : `מדהים! הרכבתם לבד: ${word.english} — ${word.hebrew}!`,
+      );
       return;
     }
     playSfx('tryAgain');
@@ -148,6 +158,22 @@ function SpellWord({ word, taskId, onComplete, continueLabel }: { word: WordDef;
             <SpeakButton text={word.english} sayHe={support.level >= 1 ? word.sayItHe : undefined} label={`השמעת המילה ${word.hebrew} באנגלית`} testId="spell-speak" />
           </div>
         </div>
+        {word.kosmoSpelling && (
+          <p className="flex items-center gap-2 flex-wrap justify-center text-lg font-bold" data-testid="kosmo-spelling">
+            קוסמו כתב:
+            <bdi dir="ltr" className="en text-2xl text-try line-through decoration-3 px-3 rounded-xl bg-try-bg border-3 border-dashed border-try">
+              {word.kosmoSpelling}
+            </bdi>
+            {done && (
+              <>
+                <span aria-hidden="true">←</span>
+                <bdi dir="ltr" className="en text-2xl text-good px-3 rounded-xl bg-good-bg border-3 border-good anim-pop">
+                  {word.english}
+                </bdi>
+              </>
+            )}
+          </p>
+        )}
         <div dir="ltr" className={`flex gap-2 sm:gap-3 justify-center ${shake ? 'anim-shake' : ''}`} data-testid="spell-slots" aria-label="המשבצות של המילה">
           {target.map((ch, i) => {
             const t = tileById(slots[i]);

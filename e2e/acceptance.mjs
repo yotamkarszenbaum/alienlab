@@ -130,21 +130,30 @@ function helpers(page) {
     }
   }
 
-  async function doWarmup(mode = () => 'right') {
+  /** Kosmo's mix-ups. mode(roundId) → 'right' (answer perfectly) or 'misjudge' (judge Kosmo wrongly first). */
+  async function doMixup(mode = () => 'right', onRound) {
     const s0 = await stepId();
-    for (let g = 0; g < 12; g++) {
+    for (let g = 0; g < 14; g++) {
       if ((await stepId()) !== s0) return;
-      if (await exists('[data-testid=warmup-summary]')) {
+      if (await exists('[data-testid=mixup-summary]')) {
         await click('[data-testid=next-btn]');
         return;
       }
-      if (!(await exists('[data-testid=warmup-step]'))) {
+      if (!(await exists('[data-testid=mixup-round]'))) {
         await sleep(400);
         continue;
       }
-      const w = await page.getAttribute('[data-testid=warmup-step]', 'data-word');
-      if (mode(w) === 'dont-know') await click('[data-testid=dont-know]');
-      else await click('[data-testid=options] button[data-correct=true]');
+      const rid = await page.getAttribute('[data-testid=mixup-round]', 'data-round');
+      const right = (await page.getAttribute('[data-testid=mixup-round]', 'data-kosmo-right')) === 'true';
+      const misjudge = mode(rid) === 'misjudge';
+      await click(right !== misjudge ? '[data-testid=judge-right]' : '[data-testid=judge-wrong]');
+      if ((await page.getAttribute('[data-testid=mixup-round]', 'data-stage')) === 'find') {
+        if (onRound) await onRound(rid, 'find');
+        await click('[data-testid=mixup-sentence] [data-wrong=true]');
+        if (onRound) await onRound(rid, 'fix');
+        await click('[data-testid=mixup-choices] button[data-correct=true]');
+      }
+      if (onRound) await onRound(rid, 'done');
       await click('[data-testid=next-btn]');
     }
   }
@@ -165,12 +174,12 @@ function helpers(page) {
       else if (type === 'build') await doBuild();
       else if (type === 'says' || type === 'read') await answerQuestions();
       else if (type === 'fill') await doFill();
-      else if (type === 'warmup') await doWarmup();
+      else if (type === 'mixup') await doMixup();
       else if (type === 'play') await doMission();
       else if (type === 'summary') return;
     }
   }
-  return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, doBuild, doSpell, doFill, doWarmup, playUnit };
+  return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, doBuild, doSpell, doFill, doMixup, playUnit };
 }
 
 async function startNewGame(page, h, level = 1) {
@@ -524,7 +533,19 @@ await h.click('[data-testid=station-earth]');
 const firstNew = await h.stepId();
 let l2Fill = null;
 let l2Spell = [];
+let l2Example = '';
+let l2Kosmo = '';
+let l2Review = false;
 await h.playUnit({
+  'car-discover': async () => {
+    l2Example = (await h.exists('[data-testid=discover-example]')) ? await h.text('[data-testid=discover-example]') : '';
+    await page.screenshot({ path: SHOTS + 'd23a-discover-example.png', fullPage: true });
+    await h.click('[data-testid=next-btn]');
+  },
+  'earth-kosmo': async () => {
+    l2Review = await h.exists('[data-testid=mixup-round]');
+    await h.doMixup();
+  },
   'earth-fill': async () => {
     await page.screenshot({ path: SHOTS + 'd23b-fill.png', fullPage: true });
     await h.click('[data-testid=fill-bank] button[data-correct=false]');
@@ -538,13 +559,15 @@ await h.playUnit({
     for (let g = 0; g < 4; g++) {
       if (!(await h.exists('[data-testid=spell-word]'))) break;
       l2Spell.push(await page.getAttribute('[data-testid=spell-word]', 'data-word'));
+      if (!l2Kosmo && (await h.exists('[data-testid=kosmo-spelling]'))) l2Kosmo = await h.text('[data-testid=kosmo-spelling]');
       await h.doSpell();
       if ((await h.stepId()) !== 'earth-spell') break;
     }
   },
 });
 note('רמה 2: השלמת משפט ממאגר מילים', `אחרי בחירה שגויה הוצג טיפ: "${l2Fill?.tip.replace(/\s+/g, ' ')}"; נרשמה טעות ל-CAT: ${l2Fill?.catWrong}; הושלמו: ${l2Fill?.filled.join(', ')}`, !!l2Fill && l2Fill.tip.length > 0 && l2Fill.catWrong >= 1 && l2Fill.filled.includes('cat') && l2Fill.filled.includes('hat'));
-note('רמה 2: איות מילים קצרות (CVC)', `מילים לאיות: ${l2Spell.join(', ')}`, l2Spell[0] === 'cat');
+note('רמה 2: איות מילים קצרות (CVC)', `מילים לאיות: ${l2Spell.join(', ')}; קוסמו כתב קודם: "${l2Kosmo.replace(/\s+/g, ' ').trim()}"`, l2Spell[0] === 'cat' && l2Kosmo.includes('KAT'));
+note('רמה 2: מילה חדשה במשפט, וסבב "קוסמו מתבלבל" באמצע התחנה', `משפט לדוגמה ב-CAR: "${l2Example.replace(/\s+/g, ' ').trim()}"; סבב קוסמו במקום תרגול מעורב: ${l2Review}`, l2Example.includes('I HAVE A RED CAR') && l2Review);
 const sL2 = await h.save();
 note('העלאת רמה באמצע המשחק (1→2)', `תג רמה: "${chip.trim()}"; תחנות עם "מילים חדשות": ${newBadges}; השלב הבא ביחידה 1: ${firstNew}; CAR נלמדה: ${sL2.learning.car.introduced}; יחידות שהושלמו נשמרו: ${sL2.game.completedUnits.length}`, chip.includes('חוקרי חלל') && newBadges === 3 && firstNew === 'car-discover' && sL2.learning.car.introduced && sL2.game.completedUnits.length === 3);
 await h.click('[data-testid=back-to-lab]');
@@ -764,7 +787,7 @@ note('רמה 3: השלמת משפט עם IN/ON/UNDER', `משפטים: ${fillInfo
 note('רמה 3: קריאת הודעה', `שורות בהודעה: ${readInfo?.lines}; אחרי טעות הודגשה שורה ${readInfo?.hl}; שאלות שנענו: ${readInfo?.done.join(', ')}`, readInfo?.lines === 4 && readInfo.hl === '1' && ['q1', 'q2', 'q3'].every((q) => readInfo.done.includes(q)));
 note('רמה 3: קוסמו לומד UNDER', `אחרי "כדור אדום מתחת לשולחן": ${underInfo?.g1}; בבדיקה בחר ${underInfo?.choice}; יכולת "יודע איפה דברים נמצאים": ${underInfo?.ability}`, underInfo?.g1 === 'kind:ball' && underInfo.choice.includes('ball') && !underInfo.choice.includes('under') && underInfo.ability);
 await h3.click('[data-testid=back-to-lab]');
-note('רמה 3: מילים נוספות ביחידה 1', `שלבים ששוחקו כוללים: ${['earth-warmup', 'cup-discover', 'earth-spell'].filter((x) => seen3.includes(x)).join(', ')}; מילים מוכרות דולגו: ${!seen3.includes('apple-discover') && !seen3.includes('car-discover')}; מילים שנחשפו ביחידה: ${['apple', 'ball', 'cat', 'dog', 'car', 'hat', 'cup'].filter((w) => s3.learning[w].introduced).length}/7`, seen3.includes('earth-warmup') && seen3.includes('cup-discover') && seen3.includes('earth-spell') && !seen3.includes('apple-discover'));
+note('רמה 3: מילים נוספות ביחידה 1', `שלבים ששוחקו כוללים: ${['earth-mixup', 'cup-discover', 'earth-kosmo', 'earth-spell'].filter((x) => seen3.includes(x)).join(', ')}; מילים מוכרות דולגו: ${!seen3.includes('apple-discover') && !seen3.includes('car-discover')}; מילים שנחשפו ביחידה: ${['apple', 'ball', 'cat', 'dog', 'car', 'hat', 'cup'].filter((w) => s3.learning[w].introduced).length}/7`, ['earth-mixup', 'cup-discover', 'earth-kosmo', 'earth-spell'].every((x) => seen3.includes(x)) && !seen3.includes('apple-discover') && !seen3.includes('earth-mix'));
 note('רמה 3: הרכבת מילה ארוכה מאותיות + רמז', `מילה: ${spellInfo?.target}; אחרי הרכבה שגויה: רמז ברמה ${spellInfo?.hintLevel}, אותיות ירוקות שנשארו: ${spellInfo?.greenKept}; סיום: "${spellInfo?.doneLine}"`, spellInfo?.hintLevel === '1' && spellInfo.greenKept === spellInfo.target.length - 1);
 note('הרכבה נשמרת בנפרד מזיהוי', `${spellInfo?.target}: איות שגוי ${spellInfo?.first.spellWrong}, איות בעזרה ${spellInfo?.first.spellWithHelp}; ${spellInfo?.secondId}: איות לבד ${spellInfo?.second?.spellIndependent}; שגיאות הזיהוי של ${spellInfo?.target} לא השתנו: ${spellInfo?.first.wrong === spellInfo?.firstRecognitionWrongBefore}`, spellInfo?.first.spellWrong === 1 && spellInfo.first.spellWithHelp === 1 && spellInfo.second?.spellIndependent === 1 && spellInfo.first.wrong === spellInfo.firstRecognitionWrongBefore);
 await gotoParents(p3, h3);
@@ -790,18 +813,38 @@ const afterPick = await h3.save();
 note('משחק חדש מההתחלה (מסך הפתיחה)', `כפתור "משחק חדש": ${hasNewBtn}; ${version}; "ביטול" שמר ${keptAfterCancel} ניסיונות; אחרי אישור: מסך בחירת רמה ${onLevel}, ניסיונות שמורים ${afterNew?.attempts.length ?? 0}; רמה חדשה שנבחרה: ${afterPick.game.level}`, hasNewBtn && keptAfterCancel > 0 && onLevel && (afterNew?.attempts.length ?? 0) === 0 && afterPick.game.level === 2 && version.includes(`v${PKG_VERSION}`));
 await ctx3.close();
 
-// ---- Warm-up (levels 2–3): known words skip their introduction
+// ---- "Kosmo gets confused" opens the station at levels 2–3
 const ctxW = await browser.newContext({ viewport: { width: 1180, height: 900 } });
 const pw = await ctxW.newPage();
 const hw = helpers(pw);
 await startNewGame(pw, hw, 2);
 await hw.click('[data-testid=station-earth]');
 const firstStep = await hw.stepId();
-await pw.screenshot({ path: SHOTS + 'd34-warmup.png', fullPage: true });
-await hw.doWarmup((w) => (w === 'cat' ? 'dont-know' : 'right'));
+await pw.screenshot({ path: SHOTS + 'd34-mixup.png', fullPage: true });
+let mixHint = '';
+const roundsSeen = [];
+await hw.doMixup(
+  (rid) => (rid === 'e2-4' ? 'misjudge' : 'right'),
+  async (rid, stage) => {
+    if (stage === 'find' && !roundsSeen.includes(rid)) {
+      roundsSeen.push(rid);
+      if (rid === 'e2-4') mixHint = await hw.text('[data-testid=alien-line]');
+    }
+    if (stage === 'fix' && rid === 'e2-1') await pw.screenshot({ path: SHOTS + 'd35-mixup-fix.png', fullPage: true });
+    if (stage === 'done' && rid === 'e2-4') await pw.screenshot({ path: SHOTS + 'd36-mixup-done.png', fullPage: true });
+  },
+);
 const sW = await hw.save();
-const afterWarm = await hw.stepId();
-note('בדיקה קצרה "מה אתם כבר יודעים" (רמות 2–3)', `שלב ראשון ברמה 2: ${firstStep}; אחרי הבדיקה (CAT סומנה "עוד לא למדתי") השלב הבא: ${afterWarm}; שגיאות שנרשמו ל-CAT: ${sW.learning.cat.wrong}; APPLE נרשמה כזיהוי עצמאי: ${sW.learning.apple.independentCorrect === 1}`, firstStep === 'earth-warmup' && afterWarm === 'cat-discover' && sW.learning.cat.wrong === 0 && sW.learning.apple.independentCorrect === 1);
+const afterMix = await hw.stepId();
+const doneE = sW.game.doneSteps.earth ?? [];
+const mixAttempts = sW.attempts.filter((a) => a.taskType === 'fix_kosmo');
+note(
+  '"קוסמו מתבלבל" פותח את התחנה (רמות 2–3)',
+  `שלב ראשון ברמה 2: ${firstStep}; סבבים: ${new Set(mixAttempts.map((a) => a.taskId)).size}; אחרי טעות בשיפוט (CAT): "${mixHint.replace(/\s+/g, ' ').slice(0, 60)}…"; השלב הבא: ${afterMix}; היכרות עם CAT דולגה: ${doneE.includes('cat-discover')}; APPLE דילגה גם על התרגול: ${doneE.includes('apple-practice')}; APPLE נרשמה כזיהוי עצמאי: ${sW.learning.apple.independentCorrect >= 1}`,
+  firstStep === 'earth-mixup' && afterMix === 'cat-practice' && doneE.includes('cat-discover') && !doneE.includes('cat-practice') && doneE.includes('apple-practice') && sW.learning.apple.independentCorrect >= 1 && sW.learning.cat.wrong >= 1 && mixHint.includes('התבלבלתי'),
+);
+await hw.click('[data-testid=home-btn]');
+await pw.screenshot({ path: SHOTS + 'd37-after-mixup.png', fullPage: true });
 await ctxW.close();
 
 // ---- Old (v1) save from the first version of the game still loads

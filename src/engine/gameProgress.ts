@@ -52,7 +52,7 @@ export function stepIndexOf(g: GameProgress, unit: UnitDef): number {
 export function hasNewSteps(g: GameProgress, unit: UnitDef): boolean {
   if (!g.completedUnits.includes(unit.id)) return false;
   const done = g.doneSteps[unit.id] ?? [];
-  return visibleSteps(g, unit).some((s) => s.type !== 'summary' && s.type !== 'warmup' && !done.includes(s.id));
+  return visibleSteps(g, unit).some((s) => s.type !== 'summary' && !(s.type === 'mixup' && s.opening) && !done.includes(s.id));
 }
 
 export function unitStatus(g: GameProgress, unit: UnitDef): UnitStatus {

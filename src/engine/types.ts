@@ -58,7 +58,8 @@ export type TaskType =
   | 'spell_word' // 7. build the English word from letter tiles (production, levels 2–3)
   | 'build_sentence' // 8. build an English phrase from word chips (levels 2–3)
   | 'fill_blank' // 9. complete a sentence from a word bank (levels 2–3)
-  | 'read'; // 10. read a short message and answer with pictures (level 3)
+  | 'read' // 10. read a short message and answer with pictures (level 3)
+  | 'fix_kosmo'; // 11. catch and fix Kosmo's mistake in an English sentence (levels 2–3)
 
 export type DiscoverVisual =
   | { type: 'single'; item: ItemSpec }
@@ -105,6 +106,10 @@ export interface WordDef {
   /** Discover screen line of the alien. */
   discoverLineHe: string;
   teach?: TeachConfig;
+  /** Levels 2–3: the new word in a short sentence made of words the child already knows. */
+  example?: { en: string; he: string; picture: ItemSpec };
+  /** Levels 2–3 spelling: how Kosmo writes the word "by its sound" (a typical Hebrew-speaker spelling mistake). */
+  kosmoSpelling?: string;
 }
 
 export interface SentenceDef {
@@ -146,6 +151,30 @@ export interface BuildDef {
 }
 
 /** Complete the sentence: "I SEE A ___." with a bank of 2–3 chips. */
+export interface MixupRoundDef {
+  id: string;
+  minLevel?: Level;
+  maxLevel?: Level;
+  /** What the picture shows (for an action: the end state). */
+  picture: ItemSpec;
+  /** For an action (OPEN / CLOSE): the state before, shown with an arrow. */
+  pictureFrom?: ItemSpec;
+  /** What Kosmo says, word by word. */
+  tokens: string[];
+  /** Index of Kosmo's wrong word. Missing = Kosmo is right this time. */
+  wrongAt?: number;
+  /** The right word for that place. */
+  fix?: string;
+  /** Replacement choices (including the fix); every other choice does not fit. */
+  choices?: string[];
+  /** Hebrew of the correct sentence. */
+  hebrew: string;
+  /** What to look at — the first hint. */
+  tipHe: string;
+  /** Game words of this unit that the round checks. */
+  wordIds: string[];
+}
+
 export interface FillDef {
   id: string;
   minLevel?: Level;
@@ -173,8 +202,12 @@ export interface ReadQuestionDef {
 export type StepDef = { minLevel?: Level; maxLevel?: Level } & (
   | { id: string; type: 'discover'; wordId: string }
   | { id: string; type: 'says'; scene: ItemSpec[]; rounds: SaysRoundDef[] }
-  /** Levels 2–3: quick check of words from lower levels; known words skip their introduction. */
-  | { id: string; type: 'warmup' }
+  /**
+   * Levels 2–3: "Kosmo gets confused" — Kosmo describes a picture in English and sometimes gets a word wrong;
+   * the child judges, finds the wrong word and fixes it. With `opening`, it opens the station and checks the
+   * basic words: words the child already knows skip their introduction.
+   */
+  | { id: string; type: 'mixup'; opening?: boolean; rounds: MixupRoundDef[] }
   | { id: string; type: 'build'; sentences: BuildDef[] }
   | { id: string; type: 'practice'; questions: QuestionDef[]; titleHe?: string }
   | { id: string; type: 'sentence'; sentenceId: string; questions: QuestionDef[] }

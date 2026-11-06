@@ -38,7 +38,7 @@ function BuildSentence({ def, taskId, onComplete, continueLabel }: { def: BuildD
   const [done, setDone] = useState(false);
   const [shake, setShake] = useState(false);
   const [mood, setMood] = useState<AlienMood>('curious');
-  const [line, setLine] = useState(`איך אומרים באנגלית "${def.hebrew}"? סדרו לי את המילים לפי הסדר הנכון.`);
+  const [line, setLine] = useState(`רציתי לומר באנגלית "${def.hebrew}", אבל המילים שלי התערבבו! 😵 תסדרו לי אותן לפי הסדר?`);
   const busy = useRef(false);
 
   const chipById = (id: string | null) => chips.find((c) => c.id === id);
