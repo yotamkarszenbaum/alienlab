@@ -6,14 +6,14 @@
 //  - newer schema versions   -> not overwritten; game runs without saving
 //  - storage not available   -> in-memory mode (progress not saved)
 // ---------------------------------------------------------------------------
-import type { AlienKnowledge, AttemptRecord, ConceptKnowledge, GameProgress, SaveData, Settings, WordProgress } from './types';
+import type { AlienKnowledge, AttemptRecord, ConceptKnowledge, GameProgress, Level, SaveData, Settings, WordProgress } from './types';
 import { emptyWordProgress, MAX_ATTEMPT_LOG } from './learning';
 import { emptyAlien, emptyConcept } from './alienMind';
 import { emptyGame } from './gameProgress';
 import { WORDS } from '../content/words';
-import { UNITS, UNITS_BY_ID } from '../content/units';
+import { UNITS, UNITS_BY_ID, stepsFor } from '../content/units';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const STORAGE_KEY = 'alienlab:save';
 export const BACKUP_KEY_PREFIX = 'alienlab:save-backup:';
 
@@ -68,6 +68,9 @@ function normWord(x: unknown): WordProgress {
           .map((r) => ({ at: num(r.at), result: r.result as 'independent' | 'with_help' | 'wrong' }))
       : [],
     recent: Array.isArray(x.recent) ? (x.recent.filter((r) => r === 'i' || r === 'h' || r === 'w') as ('i' | 'h' | 'w')[]) : [],
+    spellIndependent: num(x.spellIndependent),
+    spellWithHelp: num(x.spellWithHelp),
+    spellWrong: num(x.spellWrong),
   };
 }
 
@@ -98,12 +101,13 @@ function normGame(x: unknown): GameProgress {
   const g = emptyGame();
   if (!isObj(x)) return g;
   const knownUnit = (id: string) => !!UNITS_BY_ID[id];
-  const unitStep: Record<string, number> = {};
-  if (isObj(x.unitStep))
-    for (const [k, v] of Object.entries(x.unitStep)) {
+  const doneSteps: Record<string, string[]> = {};
+  if (isObj(x.doneSteps))
+    for (const [k, v] of Object.entries(x.doneSteps)) {
       const u = UNITS_BY_ID[k];
-      if (u) unitStep[k] = Math.max(0, Math.min(u.steps.length - 1, Math.floor(num(v))));
+      if (u) doneSteps[k] = [...new Set(strArr(v).filter((id) => u.steps.some((s) => s.id === id)))];
     }
+  const level = x.level === 1 || x.level === 2 || x.level === 3 ? (x.level as Level) : null;
   const teachState: GameProgress['teachState'] = {};
   if (isObj(x.teachState))
     for (const [k, v] of Object.entries(x.teachState)) {
@@ -121,8 +125,9 @@ function normGame(x: unknown): GameProgress {
   const current = typeof x.currentUnitId === 'string' && knownUnit(x.currentUnitId) ? x.currentUnitId : null;
   return {
     introSeen: bool(x.introSeen),
+    level,
     currentUnitId: current && unlocked.includes(current) ? current : null,
-    unitStep,
+    doneSteps,
     teachState,
     completedUnits: completed,
     unlockedUnits: unlocked,
@@ -172,8 +177,23 @@ export function normalize(raw: Record<string, unknown>, now: number): SaveData {
 // ----------------------------- migrations ---------------------------------
 // Each entry upgrades a save from version N to N+1. Version 0 = pre-release
 // saves that had no "version" field and kept learning data under "words".
+// Version 1 stored progress as a step index per unit and had no levels:
+// convert it to finished step ids and keep those players on level 1.
 const MIGRATIONS: Record<number, (d: Record<string, unknown>) => Record<string, unknown>> = {
   0: (d) => ({ ...d, learning: d.learning ?? d.words, version: 1 }),
+  1: (d) => {
+    const g: Record<string, unknown> = isObj(d.game) ? { ...d.game } : {};
+    const unitStep = isObj(g.unitStep) ? g.unitStep : {};
+    const completed = strArr(g.completedUnits);
+    const doneSteps: Record<string, string[]> = {};
+    for (const u of UNITS) {
+      const steps = stepsFor(u, 1);
+      const n = completed.includes(u.id) ? steps.length : Math.max(0, Math.floor(num(unitStep[u.id])));
+      if (n > 0) doneSteps[u.id] = steps.slice(0, n).map((s) => s.id);
+    }
+    delete g.unitStep;
+    return { ...d, game: { ...g, doneSteps, level: 1 }, version: 2 };
+  },
 };
 
 export function migrate(raw: Record<string, unknown>): { data: Record<string, unknown>; migrated: boolean } {
@@ -260,5 +280,5 @@ export function clearSave(storage: StorageLike | null = getStorage()): boolean {
 }
 
 export function hasProgress(d: SaveData): boolean {
-  return d.game.introSeen || d.attempts.length > 0 || Object.values(d.game.unitStep).some((s) => s > 0);
+  return d.game.introSeen || d.game.level !== null || d.attempts.length > 0 || Object.values(d.game.doneSteps).some((s) => s.length > 0);
 }

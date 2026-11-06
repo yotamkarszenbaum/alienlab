@@ -24,6 +24,9 @@ export type ColorName =
   | 'gray'
   | 'black';
 export type Size = 'small' | 'normal' | 'big';
+
+/** Difficulty level, chosen by age range (6–7 / 8–9 / 10–12) — never by exact age. */
+export type Level = 1 | 2 | 3;
 export type ItemState = 'none' | 'open' | 'closed';
 
 /** A concrete picture in the game, e.g. a big blue ball or an open brown door. */
@@ -44,12 +47,13 @@ export type TaskType =
   | 'teach_example' // 3. choose an example to teach the alien
   | 'check_alien' // 4. check the alien's decision
   | 'repair_example' // 5. choose a corrective example
-  | 'mission'; // 6. complete a mission combining learned words
+  | 'mission' // 6. complete a mission combining learned words
+  | 'spell_word'; // 7. build the English word from letter tiles (production, level 3)
 
 export type DiscoverVisual =
   | { type: 'single'; item: ItemSpec }
   | { type: 'set'; items: ItemSpec[] }
-  | { type: 'compare'; target: ItemSpec; contrast: ItemSpec }
+  | { type: 'compare'; target: ItemSpec; contrast: ItemSpec; targetLabelHe?: string; contrastLabelHe?: string }
   | { type: 'transition'; from: ItemSpec; to: ItemSpec };
 
 export interface TeachConfig {
@@ -69,6 +73,8 @@ export interface WordDef {
   id: string;
   english: string;
   hebrew: string;
+  /** First difficulty level that includes this word (default 1 = everyone). */
+  minLevel?: Level;
   /** Hebrew transliteration of the English pronunciation (audio fallback). */
   sayItHe: string;
   category: WordCategory;
@@ -104,18 +110,21 @@ export interface SentenceDef {
 
 export interface QuestionDef {
   id: string;
+  minLevel?: Level;
   mode: 'word_to_picture' | 'picture_to_word' | 'sentence_to_picture';
   wordId?: string;
   sentenceId?: string;
 }
 
-export type StepDef =
+export type StepDef = { minLevel?: Level } & (
   | { id: string; type: 'discover'; wordId: string }
   | { id: string; type: 'practice'; questions: QuestionDef[]; titleHe?: string }
   | { id: string; type: 'sentence'; sentenceId: string; questions: QuestionDef[] }
+  | { id: string; type: 'spell'; wordIds: string[] }
   | { id: string; type: 'teach'; conceptId: string }
   | { id: string; type: 'play'; missionId: string }
-  | { id: string; type: 'summary' };
+  | { id: string; type: 'summary' }
+);
 
 export interface UnitDef {
   id: string;
@@ -135,6 +144,7 @@ export type SceneEffect =
 
 export interface MissionStepDef {
   id: string;
+  minLevel?: Level;
   promptEn: string;
   promptHe: string;
   wordIds: string[];
@@ -215,6 +225,10 @@ export interface WordProgress {
   delayedReviews: DelayedReview[];
   /** Last results, newest last: i = independent, h = with help, w = wrong. */
   recent: ('i' | 'h' | 'w')[];
+  /** Production (spelling the word from letters) — tracked apart from recognition. */
+  spellIndependent: number;
+  spellWithHelp: number;
+  spellWrong: number;
 }
 
 // ---------------------------- Alien knowledge ------------------------------
@@ -251,9 +265,12 @@ export interface TeachStepState {
 
 export interface GameProgress {
   introSeen: boolean;
+  /** Chosen difficulty level; null until the player picks one. */
+  level: Level | null;
   currentUnitId: string | null;
-  /** Index of the current step in each unit. */
-  unitStep: Record<string, number>;
+  /** Ids of finished steps per unit. The current step = first visible step not done
+   *  (robust when the level changes and steps are added or hidden). */
+  doneSteps: Record<string, string[]>;
   teachState: Record<string, TeachStepState>;
   completedUnits: string[];
   unlockedUnits: string[];

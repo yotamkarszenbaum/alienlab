@@ -6,8 +6,10 @@ import { IconArrowLeft, IconBrain, IconCheck, IconLock, IconParent, IconStar } f
 import { useGame, now } from '../state/GameContext';
 import { useNav } from '../state/nav';
 import { hasProgress } from '../engine/storage';
-import { UNITS, REWARD_LABELS } from '../content/units';
-import { stepIndexOf, unitStatus } from '../engine/gameProgress';
+import { UNITS, REWARD_LABELS, unitWordIds } from '../content/units';
+import { LEVELS, LEVELS_BY_ID } from '../content/levels';
+import { hasNewSteps, levelOfGame, setLevel, stepIndexOf, unitStatus, visibleSteps } from '../engine/gameProgress';
+import type { Level } from '../engine/types';
 import { dueWords, wordsNeedingPractice } from '../engine/session';
 import { WORDS } from '../content/words';
 import { item } from '../content/items';
@@ -46,7 +48,7 @@ export function HomeScreen() {
         <h1 className="en text-[clamp(3rem,12vw,5.5rem)] leading-none text-primary-dark drop-shadow-[0_4px_0_#fff]" lang="en" dir="ltr">
           AlienLab
         </h1>
-        <p className="text-2xl font-bold -mt-2">לומדים אנגלית עם החייזר זיבי</p>
+        <p className="text-2xl font-bold -mt-2">לומדים אנגלית עם החייזר קוסמו</p>
         <div className="flex gap-4 items-end justify-center" aria-hidden>
           <ItemArt item={item('apple', 'red')} size={58} decorative />
           <ItemArt item={item('ball', 'blue')} size={58} decorative />
@@ -56,11 +58,15 @@ export function HomeScreen() {
         {notice && <p className="card px-4 py-3 text-lg font-medium max-w-md">{notice}</p>}
         <div className="flex flex-col items-center gap-4 mt-2">
           {saved ? (
-            <BigButton onClick={() => go(data.game.introSeen ? { name: 'lab' } : { name: 'intro' })} className="!text-2xl !px-10 !min-h-[68px]" testId="continue-btn">
+            <BigButton
+              onClick={() => go(!data.game.level ? { name: 'level' } : data.game.introSeen ? { name: 'lab' } : { name: 'intro' })}
+              className="!text-2xl !px-10 !min-h-[68px]"
+              testId="continue-btn"
+            >
               המשך משחק <IconArrowLeft size={28} />
             </BigButton>
           ) : (
-            <BigButton onClick={() => go({ name: 'intro' })} className="!text-2xl !px-10 !min-h-[68px]" testId="start-btn">
+            <BigButton onClick={() => go({ name: 'level' })} className="!text-2xl !px-10 !min-h-[68px]" testId="start-btn">
               התחל משחק <IconArrowLeft size={28} />
             </BigButton>
           )}
@@ -78,7 +84,7 @@ export function HomeScreen() {
 // ------------------------------- Intro --------------------------------------
 
 const INTRO: { text: string; mood: AlienMood }[] = [
-  { text: 'שלום! אני זיבי, חייזר קטן שהגיע לכדור הארץ.', mood: 'happy' },
+  { text: 'שלום! אני קוסמו, חייזר קטן שהגיע לכדור הארץ.', mood: 'happy' },
   { text: 'אני רוצה ללמוד אנגלית, אבל אני לא יודע אפילו מילה אחת.', mood: 'confused' },
   { text: 'רוצים שנלמד יחד? קודם נגלה מילים חדשות, ואחר כך אתם תלמדו אותי!', mood: 'curious' },
 ];
@@ -133,6 +139,12 @@ export function IntroScreen() {
 
 // -------------------------------- Lab ---------------------------------------
 
+/** "תפוח, כדור, חתול וכלב" */
+function listHe(items: string[]): string {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} ו${items[items.length - 1]}`;
+}
+
 export function LabScreen({ message }: { message?: string }) {
   const { data } = useGame();
   const { go } = useNav();
@@ -141,7 +153,8 @@ export function LabScreen({ message }: { message?: string }) {
   const due = dueWords(data, t);
   const practice = wordsNeedingPractice(data);
   const allDone = UNITS.every((u) => data.game.completedUnits.includes(u.id));
-  const fresh = Object.values(data.game.unitStep).every((s) => !s) && data.attempts.length === 0;
+  const fresh = Object.values(data.game.doneSteps).every((s) => !s.length) && data.attempts.length === 0;
+  const level = levelOfGame(data.game);
   const returning = data.game.lastPlayedAt && t - data.game.lastPlayedAt > 12 * 60 * 60 * 1000;
 
   let line = 'איזה כיף שחזרתם! נמשיך מאיפה שעצרנו?';
@@ -161,7 +174,18 @@ export function LabScreen({ message }: { message?: string }) {
 
   return (
     <>
-      <TopBar onHome={() => go({ name: 'home' })} homeLabel="חזרה למסך הפתיחה" title="המעבדה של זיבי" />
+      <TopBar
+        onHome={() => go({ name: 'home' })}
+        homeLabel="חזרה למסך הפתיחה"
+        title={
+          <span className="flex items-center gap-2 flex-wrap">
+            המעבדה של קוסמו
+            <span className="text-sm font-bold rounded-full bg-white border-2 border-line px-2 py-0.5" data-testid="level-chip">
+              {'⭐'.repeat(level)} {LEVELS_BY_ID[level].titleHe}
+            </span>
+          </span>
+        }
+      />
       <Page>
         <div className="flex flex-col gap-5" data-testid="lab-screen">
           <AlienStage mood={mood} text={line} />
@@ -177,7 +201,7 @@ export function LabScreen({ message }: { message?: string }) {
                 🧠
               </span>
               <span className="flex-1">
-                <span className="block text-xl font-extrabold">משימת זיכרון: עוזרים לזיבי להיזכר</span>
+                <span className="block text-xl font-extrabold">משימת זיכרון: עוזרים לקוסמו להיזכר</span>
                 <span className="block text-base">
                   {due.length} {due.length === 1 ? 'מילה' : 'מילים'} מהפעם הקודמת
                 </span>
@@ -191,7 +215,10 @@ export function LabScreen({ message }: { message?: string }) {
               const st = unitStatus(data.game, u);
               const idx = stepIndexOf(data.game, u);
               const prev = UNITS.find((p) => p.unlocksUnitId === u.id);
-              const met = u.wordIds.filter((w) => data.learning[w]?.introduced).length;
+              const words = unitWordIds(u, level);
+              const met = words.filter((w) => data.learning[w]?.introduced).length;
+              const fresh = hasNewSteps(data.game, u);
+              const total = visibleSteps(data.game, u).length;
               return (
                 <button
                   key={u.id}
@@ -221,7 +248,7 @@ export function LabScreen({ message }: { message?: string }) {
                     </span>
                     <span className="text-xl font-extrabold flex-1">{u.titleHe}</span>
                   </div>
-                  <span className="text-base text-ink-soft">{u.subtitleHe}</span>
+                  <span className="text-base text-ink-soft">{listHe(words.map((w) => WORDS.find((x) => x.id === w)?.hebrew ?? w))}</span>
                   <span className="flex items-center gap-2 font-bold">
                     {st === 'locked' && (
                       <>
@@ -235,12 +262,17 @@ export function LabScreen({ message }: { message?: string }) {
                     )}
                     {st === 'in_progress' && (
                       <span>
-                        בתהליך: שלב {idx + 1} מתוך {u.steps.length} · {met}/4 מילים
+                        בתהליך: שלב {idx + 1} מתוך {total} · {met}/{words.length} מילים
                       </span>
                     )}
-                    {st === 'completed' && (
+                    {st === 'completed' && !fresh && (
                       <span className="text-good flex items-center gap-1">
                         <IconCheck size={22} /> הושלם! אפשר לבקר שוב
+                      </span>
+                    )}
+                    {st === 'completed' && fresh && (
+                      <span className="rounded-full bg-sun border-2 border-ink px-3 py-0.5" data-testid={`new-words-${u.id}`}>
+                        ✨ מילים חדשות ברמה שלכם!
                       </span>
                     )}
                   </span>
@@ -251,7 +283,7 @@ export function LabScreen({ message }: { message?: string }) {
 
           <div className="flex flex-wrap gap-3 justify-center">
             <BigButton variant="soft" onClick={() => go({ name: 'brain' })} testId="brain-btn">
-              <IconBrain /> מה זיבי יודע?
+              <IconBrain /> מה קוסמו יודע?
             </BigButton>
             {practice.length > 0 && (
               <BigButton variant="soft" onClick={() => go({ name: 'review', mode: 'practice' })} testId="practice-btn">
@@ -262,7 +294,7 @@ export function LabScreen({ message }: { message?: string }) {
 
           {(data.alien.abilities.length > 0 || data.game.inventory.length > 0) && (
             <div className="card p-4 flex flex-col gap-2" data-testid="inventory">
-              <p className="font-extrabold">מה זיבי השיג עד עכשיו</p>
+              <p className="font-extrabold">מה קוסמו השיג עד עכשיו</p>
               <div className="flex flex-wrap gap-2">
                 {data.alien.abilities.map((a) => {
                   const w = WORDS.find((x) => x.teach?.ability.id === a);
@@ -286,3 +318,44 @@ export function LabScreen({ message }: { message?: string }) {
   );
 }
 
+
+// ------------------------------ Level ---------------------------------------
+
+export function LevelScreen() {
+  const { data, update } = useGame();
+  const { go } = useNav();
+  const pick = (level: Level) => {
+    update((d) => ({ ...d, game: setLevel(d.game, level) }));
+    go(data.game.introSeen ? { name: 'lab' } : { name: 'intro' });
+  };
+  return (
+    <>
+      <TopBar onHome={() => go({ name: 'home' })} homeLabel="חזרה למסך הפתיחה" />
+      <Page>
+        <div className="flex flex-col gap-5" data-testid="level-screen">
+          <AlienStage mood="curious" text="לפני שמתחילים: באיזו רמה נשחק? בחרו לפי הגיל. אפשר לשנות את זה אחר כך באזור ההורים." />
+          <div className="grid sm:grid-cols-3 gap-4">
+            {LEVELS.map((l) => (
+              <button
+                key={l.level}
+                type="button"
+                data-testid={`level-${l.level}`}
+                onClick={() => pick(l.level)}
+                className={`card p-5 flex flex-col items-center gap-3 text-center cursor-pointer hover:-translate-y-1 transition ${data.game.level === l.level ? 'ring-4 ring-primary' : ''}`}
+              >
+                <span className="flex gap-1 text-sun-dark" aria-hidden>
+                  {Array.from({ length: l.stars }).map((_, k) => (
+                    <IconStar key={k} size={34} />
+                  ))}
+                </span>
+                <span className="text-2xl font-extrabold">{l.titleHe}</span>
+                <span className="rounded-full bg-lab border-2 border-line px-3 py-1 font-bold">{l.agesHe}</span>
+                <span className="text-base">{l.descriptionHe}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </Page>
+    </>
+  );
+}

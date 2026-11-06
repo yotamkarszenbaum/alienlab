@@ -71,7 +71,7 @@ export function AlienThought({ word, k, compact = false }: { word: WordDef; k: C
   const others = s.shared.filter((f) => f !== s.guess);
   return (
     <div className={`thought flex items-center gap-3 px-4 py-3 ${compact ? '' : 'min-h-[92px]'}`} data-testid="alien-thought" data-understanding={s.understanding} data-guess={s.guess ? `${s.guess.dim}:${s.guess.value}` : ''}>
-      <span className="text-sm font-bold text-ink-soft shrink-0">זיבי חושב:</span>
+      <span className="text-sm font-bold text-ink-soft shrink-0">קוסמו חושב:</span>
       {!s.guess ? (
         <span className="text-2xl font-extrabold text-primary">?</span>
       ) : (
@@ -99,7 +99,7 @@ function ExamplesTray({ k, rejected = true }: { k: ConceptKnowledge; rejected?: 
   const exs = examplesOf(k);
   return (
     <div className="flex items-center gap-2 flex-wrap" data-testid="examples-tray" data-count={exs.length}>
-      <span className="text-sm font-bold text-ink-soft">מה זיבי ראה:</span>
+      <span className="text-sm font-bold text-ink-soft">מה קוסמו ראה:</span>
       {exs.length === 0 && <span className="text-sm text-ink-soft">עדיין כלום</span>}
       {exs.map((e) => (
         <span key={itemId(e)} className="anim-pop rounded-2xl bg-white border-2 border-teal p-0.5" title={describeItemHe(e)}>
@@ -222,7 +222,7 @@ function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
       record('teach_example', 'wrong', support, support.wrong + 1);
       setLastBad(itemId(i));
       setMood('confused');
-      setLine(`הממ... זה ${describeItemHe(i)}. אנחנו מלמדים את זיבי ${EN} — ${word.hebrew}. נסו למצוא ${targetPhraseHe(target)}.`);
+      setLine(`הממ... זה ${describeItemHe(i)}. אנחנו מלמדים את קוסמו ${EN} — ${word.hebrew}. נסו למצוא ${targetPhraseHe(target)}.`);
       void speak(EN, 'en');
       return;
     }
@@ -258,7 +258,7 @@ function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
         <div className="flex items-center gap-3 flex-wrap">
           <SpeakButton text={EN} sayHe={word.sayItHe} size="sm" />
           <p className="text-xl font-bold">
-            {full ? 'זיבי ראה מספיק דוגמאות. בואו נבדוק אותו!' : <>לחצו על דברים שהם <bdi className="en text-primary-dark" dir="ltr">{EN}</bdi> ({word.hebrew}) כדי ללמד את זיבי</>}
+            {full ? 'קוסמו ראה מספיק דוגמאות. בואו נבדוק אותו!' : <>לחצו על דברים שהם <bdi className="en text-primary-dark" dir="ltr">{EN}</bdi> ({word.hebrew}) כדי ללמד את קוסמו</>}
           </p>
         </div>
         <AlienThought word={word} k={k} />
@@ -283,7 +283,7 @@ function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
               onClick={() => pick(i)}
               disabled={full || st === 'selected'}
               imgSize="clamp(80px, 22vw, 140px)"
-              caption={st === 'selected' ? <span className="text-xs font-bold text-primary-dark mt-1">זיבי ראה ✓</span> : undefined}
+              caption={st === 'selected' ? <span className="text-xs font-bold text-primary-dark mt-1">קוסמו ראה ✓</span> : undefined}
             />
           );
         })}
@@ -293,11 +293,11 @@ function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
         <BigButton
           variant="teal"
           locked={k.examples.length === 0}
-          lockedMessage="קודם מראים לזיבי לפחות דבר אחד"
+          lockedMessage="קודם מראים לקוסמו לפחות דבר אחד"
           onClick={() => setPhase({ phase: 'test' })}
           testId="start-test-btn"
         >
-          בואו נבדוק את זיבי! 🧪
+          בואו נבדוק את קוסמו! 🧪
         </BigButton>
       </div>
     </div>
@@ -316,7 +316,7 @@ function TestPhase({ word, k, ts, record, setPhase }: PhaseProps) {
   const alienRight = !!chosen && hasFeature(chosen, target);
   const [stage, setStage] = useState<'thinking' | 'chosen' | 'right' | 'wrong'>('thinking');
   const [support, setSupport] = useState<SupportState>(initialSupport);
-  const [line, setLine] = useState(`משימה לזיבי: למצוא ${targetPhraseHe(target)} — ${EN}. זיבי חושב…`);
+  const [line, setLine] = useState(`משימה לקוסמו: למצוא ${targetPhraseHe(target)} — ${EN}. קוסמו חושב…`);
   const [mood, setMood] = useState<AlienMood>('thinking');
   const busy = useRef(false);
 
@@ -352,9 +352,9 @@ function TestPhase({ word, k, ts, record, setPhase }: PhaseProps) {
       setMood('thinking');
       const d = describeItemHe(chosen);
       if (s.level >= 3) {
-        setLine(alienRight ? `זיבי בחר ${d}. זה באמת ${targetPhraseHe(target)}, אז זיבי צדק! לחצו על "צדק".` : `זיבי בחר ${d}. זה לא ${targetPhraseHe(target)}, אז זיבי טעה. לחצו על "טעה".`);
+        setLine(alienRight ? `קוסמו בחר ${d}. זה באמת ${targetPhraseHe(target)}, אז קוסמו צדק! לחצו על "צדק".` : `קוסמו בחר ${d}. זה לא ${targetPhraseHe(target)}, אז קוסמו טעה. לחצו על "טעה".`);
       } else {
-        setLine(`בואו נסתכל שוב יחד: זיבי בחר ${d}. ${word.explainHe}. האם זה ${targetPhraseHe(target)}?`);
+        setLine(`בואו נסתכל שוב יחד: קוסמו בחר ${d}. ${word.explainHe}. האם זה ${targetPhraseHe(target)}?`);
         void speak(EN, 'en');
       }
       return;
@@ -390,9 +390,9 @@ function TestPhase({ word, k, ts, record, setPhase }: PhaseProps) {
     setSupport(s);
     if (!chosen) return;
     const d = describeItemHe(chosen);
-    if (s.level === 1) setLine(`רמז: ${word.explainHe}. זיבי בחר ${d}.`);
-    else if (s.level === 2) setLine(`רמז: בדקו — האם ה${d.split(' ')[0]} שזיבי בחר הוא ${targetPhraseHe(target)}?`);
-    else setLine(alienRight ? `זיבי בחר ${d} — וזה ${targetPhraseHe(target)}. אז הוא צדק!` : `זיבי בחר ${d} — וזה לא ${targetPhraseHe(target)}. אז הוא טעה.`);
+    if (s.level === 1) setLine(`רמז: ${word.explainHe}. קוסמו בחר ${d}.`);
+    else if (s.level === 2) setLine(`רמז: בדקו — האם ה${d.split(' ')[0]} שקוסמו בחר הוא ${targetPhraseHe(target)}?`);
+    else setLine(alienRight ? `קוסמו בחר ${d} — וזה ${targetPhraseHe(target)}. אז הוא צדק!` : `קוסמו בחר ${d} — וזה לא ${targetPhraseHe(target)}. אז הוא טעה.`);
   }
 
   const s = snapshot(target, data.alien.concepts[word.id] ?? k);
@@ -410,7 +410,7 @@ function TestPhase({ word, k, ts, record, setPhase }: PhaseProps) {
         <div className="flex items-center gap-3 flex-wrap">
           <span className="rounded-full bg-teal text-white px-3 py-1 font-bold">🧪 בדיקה</span>
           <p className="text-xl font-bold">
-            זיבי מחפש: <bdi className="en text-primary-dark" dir="ltr">{EN}</bdi>
+            קוסמו מחפש: <bdi className="en text-primary-dark" dir="ltr">{EN}</bdi>
           </p>
           <SpeakButton text={EN} sayHe={word.sayItHe} size="sm" />
         </div>
@@ -428,7 +428,7 @@ function TestPhase({ word, k, ts, record, setPhase }: PhaseProps) {
               onClick={() => undefined}
               disabled
               imgSize="clamp(84px, 24vw, 150px)"
-              caption={isChoice ? <span className="text-sm font-extrabold text-teal-dark mt-1" data-testid="alien-choice">👽 זיבי בחר</span> : undefined}
+              caption={isChoice ? <span className="text-sm font-extrabold text-teal-dark mt-1" data-testid="alien-choice">👽 קוסמו בחר</span> : undefined}
             />
           );
         })}
@@ -442,7 +442,7 @@ function TestPhase({ word, k, ts, record, setPhase }: PhaseProps) {
       )}
       {stage === 'chosen' && chosen && (
         <div className="flex flex-col items-center gap-3">
-          <p className="text-2xl font-extrabold">זיבי צדק?</p>
+          <p className="text-2xl font-extrabold">קוסמו צדק?</p>
           <div className="flex gap-4 flex-wrap justify-center">
             <button type="button" className="btn btn-teal !text-xl" onClick={() => judge(true)} data-testid="judge-right">
               <IconThumbUp /> כן, צדק!
@@ -457,14 +457,14 @@ function TestPhase({ word, k, ts, record, setPhase }: PhaseProps) {
       {stage === 'chosen' && !chosen && (
         <div className="flex justify-end">
           <BigButton onClick={() => setPhase({ phase: 'repair', repairs: ts.repairs })} testId="help-alien-btn">
-            בואו נעזור לזיבי <IconArrowLeft size={24} />
+            בואו נעזור לקוסמו <IconArrowLeft size={24} />
           </BigButton>
         </div>
       )}
       {stage === 'wrong' && (
         <div className="flex justify-end">
           <BigButton variant="sun" onClick={() => setPhase({ phase: 'repair' })} testId="help-alien-btn">
-            בואו נעזור לזיבי <IconArrowLeft size={24} />
+            בואו נעזור לקוסמו <IconArrowLeft size={24} />
           </BigButton>
         </div>
       )}
@@ -491,15 +491,15 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
   const [options] = useState(() => buildRepairOptions(target, k, pool, ts.repairs));
   const guess = snap.guess;
   const question = guess
-    ? `נראה שזיבי חושב ש-${EN} זה ${guessLabelHe(guess)}. איך נראה לו ש-${EN} זה ${word.teach!.dimLabelHe}?`
-    : `זיבי עדיין לא יודע מה זה ${EN}. בואו נראה לו!`;
+    ? `נראה שקוסמו חושב ש-${EN} זה ${guessLabelHe(guess)}. איך נראה לו ש-${EN} זה ${word.teach!.dimLabelHe}?`
+    : `קוסמו עדיין לא יודע מה זה ${EN}. בואו נראה לו!`;
   const [line, setLine] = useState(question);
   const [mood, setMood] = useState<AlienMood>('confused');
   const [support, setSupport] = useState<SupportState>(initialSupport);
   const [lastBad, setLastBad] = useState<string | null>(null);
   const [fixed, setFixed] = useState<null | 'resolved' | 'new_guess'>(null);
   const busy = useRef(false);
-  const hintLine = guess ? `זיבי צריך לראות ${targetPhraseHe(target)} ${notGuessPhraseHe(guess)}.` : `זיבי צריך לראות ${targetPhraseHe(target)}.`;
+  const hintLine = guess ? `קוסמו צריך לראות ${targetPhraseHe(target)} ${notGuessPhraseHe(guess)}.` : `קוסמו צריך לראות ${targetPhraseHe(target)}.`;
 
   function apply(i: ItemSpec, byDemo = false) {
     if (busy.current || fixed) return;
@@ -515,7 +515,7 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
       setSupport(s);
       setLastBad(itemId(i));
       setMood('confused');
-      setLine(`זה ${describeItemHe(i)} — זה לא ${targetPhraseHe(target)}, אז זיבי לא לומד ממנו. ${hintLine}`);
+      setLine(`זה ${describeItemHe(i)} — זה לא ${targetPhraseHe(target)}, אז קוסמו לא לומד ממנו. ${hintLine}`);
       return;
     }
     if (r.effect === 'resolved' || r.effect === 'new_guess') {
@@ -535,15 +535,15 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
     setLastBad(itemId(i));
     setMood('thinking');
     const reaction = teachReaction(word, r.effect === 'duplicate' ? 'no_change' : r.effect, r.knowledge, r.before.guess);
-    setLine(`${reaction.line} ${guess && guess.dim === 'kind' ? `(זיבי כבר מכיר ${KIND_HE[guess.value as keyof typeof KIND_HE]?.noun ?? ''}.) ` : ''}${hintLine}`);
+    setLine(`${reaction.line} ${guess && guess.dim === 'kind' ? `(קוסמו כבר מכיר ${KIND_HE[guess.value as keyof typeof KIND_HE]?.noun ?? ''}.) ` : ''}${hintLine}`);
   }
 
   function help() {
     const s = onHelp(support, 'teach');
     setSupport(s);
     if (s.level === 1) setLine(`רמז: ${hintLine}`);
-    else if (s.level === 2) setLine(`הדוגמה שתעזור לזיבי זוהרת בצהוב. ${hintLine}`);
-    else setLine('בואו נעשה את זה יחד. לחצו על "תראו לי" ואראה לזיבי דוגמה טובה.');
+    else if (s.level === 2) setLine(`הדוגמה שתעזור לקוסמו זוהרת בצהוב. ${hintLine}`);
+    else setLine('בואו נעשה את זה יחד. לחצו על "תראו לי" ואראה לקוסמו דוגמה טובה.');
   }
 
   const helpful = options.find((o) => o.effect === 'resolved' || o.effect === 'new_guess');
@@ -553,7 +553,7 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
       <AlienStage mood={mood} text={line} />
       <div className="card p-4 flex flex-col gap-3">
         <p className="text-xl font-bold" data-testid="repair-question" data-question={question}>
-          בחרו דוגמה אחת שתעזור לזיבי להבין:
+          בחרו דוגמה אחת שתעזור לקוסמו להבין:
         </p>
         <AlienThought word={word} k={k} compact />
         <ExamplesTray k={k} />
@@ -592,7 +592,7 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
         )}
         {fixed && (
           <BigButton variant="teal" onClick={() => setPhase({ phase: 'test', tests: ts.tests + 1, repairs: ts.repairs + 1 })} testId="retest-btn">
-            לבדוק את זיבי שוב 🧪
+            לבדוק את קוסמו שוב 🧪
           </BigButton>
         )}
       </div>
@@ -623,12 +623,12 @@ function DonePhase({ word, k, onDone }: PhaseProps & { onDone: () => void }) {
         <AlienThought word={word} k={k} />
         {has && (
           <div className="anim-pop rounded-3xl bg-sun border-3 border-ink px-5 py-3 text-xl font-extrabold" data-testid="ability-badge">
-            ⭐ יכולת חדשה לזיבי: {ability.labelHe}
+            ⭐ יכולת חדשה לקוסמו: {ability.labelHe}
           </div>
         )}
         <ExamplesTray k={k} rejected={false} />
         <p className="text-lg">
-          זיבי למד מ-{k.examples.length} דוגמאות
+          קוסמו למד מ-{k.examples.length} דוגמאות
           {k.corrections.length > 0 ? ` ושיניתם לו את הדעה ${k.corrections.length === 1 ? 'פעם אחת' : `${k.corrections.length} פעמים`}` : ''}. אתם מורים מעולים!
         </p>
       </div>

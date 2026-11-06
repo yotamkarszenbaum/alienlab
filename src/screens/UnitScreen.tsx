@@ -1,12 +1,14 @@
 import { useEffect } from 'react';
 import { Page, TopBar } from '../components/ui';
 import { UNITS_BY_ID } from '../content/units';
-import { advanceStep, isUnitUnlocked, stepIndexOf } from '../engine/gameProgress';
+import { inLevel } from '../content/levels';
+import { advanceStep, isUnitUnlocked, levelOfGame, reopenStep, stepIndexOf, visibleSteps } from '../engine/gameProgress';
 import { useGame, now } from '../state/GameContext';
 import { useNav } from '../state/nav';
 import { DiscoverStep, PracticeStep, SentenceStep } from './steps/LearnSteps';
 import { TeachStep } from './steps/TeachStep';
 import { PlayStep, SummaryStep } from './steps/PlayStep';
+import { SpellStep } from './steps/SpellStep';
 
 export function UnitScreen({ unitId }: { unitId: string }) {
   const { data, update } = useGame();
@@ -25,16 +27,15 @@ export function UnitScreen({ unitId }: { unitId: string }) {
 
   if (!unit || !unlocked) return null;
 
+  const level = levelOfGame(data.game);
+  const steps = visibleSteps(data.game, unit);
   const idx = stepIndexOf(data.game, unit);
-  const step = unit.steps[idx];
+  const step = steps[idx];
   const next = () => {
-    update((d) => ({ ...d, game: advanceStep(d.game, unit.id, idx, now()) }));
+    update((d) => ({ ...d, game: advanceStep(d.game, unit.id, step.id, now()) }));
     window.scrollTo({ top: 0 });
   };
-  const goToStep = (stepId: string) => {
-    const i = unit.steps.findIndex((s) => s.id === stepId);
-    if (i >= 0) update((d) => ({ ...d, game: { ...d.game, unitStep: { ...d.game.unitStep, [unit.id]: i } } }));
-  };
+  const goToStep = (stepId: string) => update((d) => ({ ...d, game: reopenStep(d.game, unit.id, stepId) }));
 
   let body;
   switch (step.type) {
@@ -42,10 +43,13 @@ export function UnitScreen({ unitId }: { unitId: string }) {
       body = <DiscoverStep key={step.id} wordId={step.wordId} onDone={next} />;
       break;
     case 'practice':
-      body = <PracticeStep key={step.id} questions={step.questions} onDone={next} />;
+      body = <PracticeStep key={step.id} questions={step.questions.filter((q) => inLevel(q.minLevel, level))} onDone={next} />;
       break;
     case 'sentence':
-      body = <SentenceStep key={step.id} sentenceId={step.sentenceId} questions={step.questions} onDone={next} />;
+      body = <SentenceStep key={step.id} sentenceId={step.sentenceId} questions={step.questions.filter((q) => inLevel(q.minLevel, level))} onDone={next} />;
+      break;
+    case 'spell':
+      body = <SpellStep key={step.id} stepId={step.id} wordIds={step.wordIds} onDone={next} />;
       break;
     case 'teach':
       body = <TeachStep key={step.id} stepId={step.id} conceptId={step.conceptId} onDone={next} />;
@@ -58,8 +62,14 @@ export function UnitScreen({ unitId }: { unitId: string }) {
         <SummaryStep
           key={step.id}
           unit={unit}
-          onFinish={() => go({ name: 'lab' })}
-          onNextUnit={(id) => go({ name: 'unit', unitId: id })}
+          onFinish={() => {
+            update((d) => ({ ...d, game: advanceStep(d.game, unit.id, step.id, now()) }));
+            go({ name: 'lab' });
+          }}
+          onNextUnit={(id) => {
+            update((d) => ({ ...d, game: advanceStep(d.game, unit.id, step.id, now()) }));
+            go({ name: 'unit', unitId: id });
+          }}
         />
       );
       break;
@@ -67,9 +77,9 @@ export function UnitScreen({ unitId }: { unitId: string }) {
 
   return (
     <>
-      <TopBar onHome={() => go({ name: 'lab' })} title={unit.titleHe} progress={{ current: idx, total: unit.steps.length }} />
+      <TopBar onHome={() => go({ name: 'lab' })} title={unit.titleHe} progress={{ current: idx, total: steps.length }} />
       <Page>
-        <div data-testid="unit-screen" data-unit={unit.id} data-step={step.id} data-step-type={step.type}>
+        <div data-testid="unit-screen" data-unit={unit.id} data-step={step.id} data-step-type={step.type} data-level={level}>
           {body}
         </div>
       </Page>

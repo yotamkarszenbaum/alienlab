@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GameProvider } from './state/GameContext';
 import { NavCtx, parentOf, type Screen } from './state/nav';
 import { ErrorBoundary } from './components/ui';
-import { HomeScreen, IntroScreen, LabScreen } from './screens/HomeScreens';
+import { HomeScreen, IntroScreen, LabScreen, LevelScreen } from './screens/HomeScreens';
 import { UnitScreen } from './screens/UnitScreen';
 import { ReviewScreen } from './screens/ReviewScreen';
 import { BrainScreen } from './screens/BrainScreen';
@@ -54,6 +54,9 @@ function Shell() {
       break;
     case 'intro':
       body = <IntroScreen />;
+      break;
+    case 'level':
+      body = <LevelScreen />;
       break;
     case 'lab':
       body = <LabScreen message={screen.message} />;

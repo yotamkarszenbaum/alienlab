@@ -1,5 +1,7 @@
 import type { WordDef } from '../engine/types';
 import { catalog, item } from './items';
+import type { Level } from '../engine/types';
+import { inLevel } from './levels';
 
 // ---------------------------------------------------------------------------
 // Central word list. To add or change a word, edit only this file (and add
@@ -80,6 +82,42 @@ export const WORDS: WordDef[] = [
       meaningHe: 'כלב — כל כלב, בכל צבע',
       dimLabelHe: 'סוג של חיה',
     },
+  },
+
+  // ---- Unit 1 extra words (higher levels) ----
+  {
+    id: 'car',
+    english: 'CAR',
+    hebrew: 'מכונית',
+    minLevel: 2,
+    sayItHe: 'קָאר',
+    category: 'object',
+    unitId: 'earth',
+    target: { dim: 'kind', value: 'car' },
+    illustration: { type: 'single', item: item('car', 'blue') },
+    positiveExamples: [item('car', 'blue'), item('car', 'red'), item('car', 'yellow'), item('car', 'green')],
+    negativeExamples: [item('ball', 'blue'), item('cup', 'red'), item('dog', 'brown'), item('apple', 'green')],
+    practiceTypes: ['word_to_picture', 'picture_to_word', 'mission'],
+    missionIds: ['m-supply', 'm-colors'],
+    explainHe: 'CAR זה מכונית',
+    discoverLineHe: 'ברום ברום! מה זה? זאת מכונית. באנגלית קוראים לה CAR.',
+  },
+  {
+    id: 'cup',
+    english: 'CUP',
+    hebrew: 'כוס',
+    minLevel: 3,
+    sayItHe: 'קַאפּ',
+    category: 'object',
+    unitId: 'earth',
+    target: { dim: 'kind', value: 'cup' },
+    illustration: { type: 'single', item: item('cup', 'yellow') },
+    positiveExamples: [item('cup', 'yellow'), item('cup', 'blue'), item('cup', 'red'), item('cup', 'green')],
+    negativeExamples: [item('ball', 'yellow'), item('apple', 'yellow'), item('star', 'yellow'), item('car', 'blue')],
+    practiceTypes: ['word_to_picture', 'picture_to_word', 'spell_word', 'mission'],
+    missionIds: ['m-supply'],
+    explainHe: 'CUP זה כוס',
+    discoverLineHe: 'אפשר לשתות ממנה! זאת כוס. באנגלית קוראים לה CUP.',
   },
 
   // ------------------------------ Unit 2 ---------------------------------
@@ -167,6 +205,42 @@ export const WORDS: WordDef[] = [
       meaningHe: 'גדול',
       dimLabelHe: 'גודל',
     },
+  },
+
+  // ---- Unit 2 extra words (higher levels) ----
+  {
+    id: 'green',
+    english: 'GREEN',
+    hebrew: 'ירוק',
+    minLevel: 2,
+    sayItHe: 'גְּרִין',
+    category: 'color',
+    unitId: 'colors',
+    target: { dim: 'color', value: 'green' },
+    illustration: { type: 'set', items: [item('apple', 'green'), item('ball', 'green'), item('car', 'green')] },
+    positiveExamples: [item('ball', 'green'), item('car', 'green'), item('cup', 'green'), item('apple', 'green')],
+    negativeExamples: [item('ball', 'red'), item('car', 'blue'), item('cup', 'yellow'), item('apple', 'red')],
+    practiceTypes: ['word_to_picture', 'picture_to_word', 'mission'],
+    missionIds: ['m-colors'],
+    explainHe: 'GREEN זה ירוק',
+    discoverLineHe: 'התפוח, הכדור והמכונית — כולם בצבע של הדשא. זה ירוק! באנגלית: GREEN.',
+  },
+  {
+    id: 'small',
+    english: 'SMALL',
+    hebrew: 'קטן',
+    minLevel: 3,
+    sayItHe: 'סְמוֹל',
+    category: 'size',
+    unitId: 'colors',
+    target: { dim: 'size', value: 'small' },
+    illustration: { type: 'compare', target: item('ball', 'blue', 'small'), contrast: item('ball', 'blue', 'big'), targetLabelHe: 'קטן ✓', contrastLabelHe: 'גדול' },
+    positiveExamples: [item('ball', 'blue', 'small'), item('dog', 'brown', 'small'), item('star', 'yellow', 'small'), item('cup', 'red', 'small')],
+    negativeExamples: [item('ball', 'blue', 'big'), item('dog', 'brown', 'big'), item('star', 'yellow', 'big'), item('cup', 'red', 'big')],
+    practiceTypes: ['word_to_picture', 'picture_to_word', 'mission'],
+    missionIds: ['m-colors'],
+    explainHe: 'SMALL זה קטן',
+    discoverLineHe: 'עכשיו ההפך מגדול: הכדור הזה קטנטן! קטן באנגלית: SMALL.',
   },
 
   // ------------------------------ Unit 3 ---------------------------------
@@ -266,9 +340,50 @@ export const WORDS: WordDef[] = [
     explainHe: 'CLOSE זה לסגור — כשמשהו נסגר',
     discoverLineHe: 'הקופסה הייתה פתוחה, ועכשיו... היא נסגרה! לסגור באנגלית זה CLOSE.',
   },
+
+  // ---- Unit 3 extra words (higher levels) ----
+  {
+    id: 'box',
+    english: 'BOX',
+    hebrew: 'קופסה',
+    minLevel: 2,
+    sayItHe: 'בּוֹקְס',
+    category: 'object',
+    unitId: 'lab',
+    target: { dim: 'kind', value: 'box' },
+    illustration: { type: 'single', item: item('box', 'red', 'normal', 'closed') },
+    positiveExamples: [item('box', 'red', 'normal', 'closed'), item('box', 'blue', 'normal', 'closed'), item('box', 'brown', 'normal', 'open'), item('box', 'green', 'normal', 'closed')],
+    negativeExamples: [item('door', 'brown', 'normal', 'closed'), item('cup', 'red'), item('car', 'blue'), item('key', 'yellow')],
+    practiceTypes: ['word_to_picture', 'picture_to_word', 'mission'],
+    missionIds: ['m-door'],
+    explainHe: 'BOX זה קופסה',
+    discoverLineHe: 'מה יש בתוך הדבר הזה? זאת קופסה! באנגלית קוראים לה BOX.',
+  },
+  {
+    id: 'star',
+    english: 'STAR',
+    hebrew: 'כוכב',
+    minLevel: 3,
+    sayItHe: 'סְטָאר',
+    category: 'object',
+    unitId: 'lab',
+    target: { dim: 'kind', value: 'star' },
+    illustration: { type: 'single', item: item('star', 'yellow') },
+    positiveExamples: [item('star', 'yellow'), item('star', 'purple'), item('star', 'orange')],
+    negativeExamples: [item('ball', 'yellow'), item('apple', 'yellow'), item('key', 'yellow'), item('cup', 'purple')],
+    practiceTypes: ['word_to_picture', 'picture_to_word', 'spell_word', 'mission'],
+    missionIds: ['m-door'],
+    explainHe: 'STAR זה כוכב',
+    discoverLineHe: 'בחלל יש המון כאלה! זה כוכב. באנגלית קוראים לו STAR.',
+  },
 ];
 
 export const WORDS_BY_ID: Record<string, WordDef> = Object.fromEntries(WORDS.map((w) => [w.id, w]));
+
+/** Words included at a given difficulty level. */
+export function wordsForLevel(level: Level | null | undefined): WordDef[] {
+  return WORDS.filter((w) => inLevel(w.minLevel, level));
+}
 
 export function getWord(id: string): WordDef {
   const w = WORDS_BY_ID[id];

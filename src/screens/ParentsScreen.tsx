@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react';
 import { BigButton, Dialog, Page, TopBar } from '../components/ui';
 import { useGame, now } from '../state/GameContext';
 import { useNav } from '../state/nav';
-import { WORDS } from '../content/words';
+import { wordsForLevel } from '../content/words';
+import { LEVELS } from '../content/levels';
+import { levelOfGame, setLevel } from '../engine/gameProgress';
 import { UNITS } from '../content/units';
-import { LEVEL_HE, levelOf, needsPractice, DAY } from '../engine/learning';
+import { LEVEL_HE, levelOf, needsPractice, spellingHe, DAY } from '../engine/learning';
 import { emptyConcept, understandingOf, UNDERSTANDING_HE } from '../engine/alienMind';
 import { useSpeechStatus, type SpeechStatus } from '../audio/speech';
 import { setTimeOffset } from '../engine/clock';
@@ -63,7 +65,10 @@ function Stat({ label, value, testId }: { label: string; value: string | number;
 const STATUS_HE: Record<SpeechStatus, string> = { ok: 'עובד', unavailable: 'לא זמין', unknown: 'עוד לא נבדק' };
 
 export function ParentsScreen() {
-  const { data, resetAll, setSettings, canSave, loadStatus } = useGame();
+  const { data, update, resetAll, setSettings, canSave, loadStatus } = useGame();
+  const level = levelOfGame(data.game);
+  const WORDS = wordsForLevel(level);
+  const showSpelling = level === 3 || WORDS.some((w) => (data.learning[w.id]?.spellIndependent ?? 0) + (data.learning[w.id]?.spellWithHelp ?? 0) + (data.learning[w.id]?.spellWrong ?? 0) > 0);
   const { go } = useNav();
   const [open, setOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -78,8 +83,9 @@ export function ParentsScreen() {
     const independent = WORDS.filter((w) => (data.learning[w.id]?.independentCorrect ?? 0) > 0);
     const practice = WORDS.filter((w) => needsPractice(data.learning[w.id]));
     const reviews = WORDS.flatMap((w) => data.learning[w.id]?.delayedReviews ?? []);
-    return { exposed, independent, practice, reviews, reviewsIndependent: reviews.filter((r) => r.result === 'independent').length };
-  }, [data]);
+    const spelled = WORDS.filter((w) => (data.learning[w.id]?.spellIndependent ?? 0) > 0);
+    return { exposed, independent, practice, reviews, spelled, reviewsIndependent: reviews.filter((r) => r.result === 'independent').length };
+  }, [data, WORDS]);
 
   if (!open)
     return (
@@ -105,6 +111,29 @@ export function ParentsScreen() {
             <Stat label="מילים שכדאי לתרגל עוד" value={stats.practice.length} testId="stat-practice" />
             <Stat label={`חזרות מאוחרות שבוצעו (${stats.reviewsIndependent} ללא עזרה)`} value={stats.reviews.length} testId="stat-reviews" />
             <Stat label="פעילויות שהושלמו" value={data.game.activities} testId="stat-activities" />
+            {showSpelling && <Stat label="מילים שהילד הרכיב לבד מאותיות (הפקה)" value={stats.spelled.length} testId="stat-spelled" />}
+          </section>
+
+          <section className="card p-5 flex flex-col gap-3" data-testid="level-settings">
+            <h2 className="text-xl font-extrabold">רמת קושי</h2>
+            <p className="text-base">הרמה נבחרת לפי טווח גילים (המשחק לא שואל גיל מדויק). אפשר לשנות בכל רגע: מילים שכבר נלמדו נשמרות. כשמעלים רמה, המילים החדשות מופיעות בתחנות כ"מילים חדשות". כשמורידים רמה, המילים הנוספות מוסתרות אבל הנתונים שלהן לא נמחקים.</p>
+            <div className="grid sm:grid-cols-3 gap-3" role="radiogroup" aria-label="רמת קושי">
+              {LEVELS.map((l) => (
+                <button
+                  key={l.level}
+                  type="button"
+                  role="radio"
+                  aria-checked={level === l.level}
+                  data-testid={`parent-level-${l.level}`}
+                  onClick={() => update((d) => ({ ...d, game: setLevel(d.game, l.level) }))}
+                  className={`rounded-3xl border-3 p-3 text-start flex flex-col gap-1 min-h-[44px] ${level === l.level ? 'border-primary bg-[#f1ecff]' : 'border-line bg-white'}`}
+                >
+                  <span className="font-extrabold text-lg">{'⭐'.repeat(l.stars)} {l.titleHe}</span>
+                  <span className="text-sm font-bold">{l.agesHe}</span>
+                  <span className="text-sm">{l.descriptionHe}</span>
+                </button>
+              ))}
+            </div>
           </section>
 
           {stats.practice.length > 0 && (
@@ -126,6 +155,7 @@ export function ParentsScreen() {
                   <th className="p-2">תרגול אחרון</th>
                   <th className="p-2">חזרה מוצעת</th>
                   <th className="p-2">בדיקה מאוחרת</th>
+                  {showSpelling && <th className="p-2">הרכבה מאותיות</th>}
                 </tr>
               </thead>
               <tbody>
@@ -150,6 +180,7 @@ export function ParentsScreen() {
                       <td className="p-2 text-center">{fmt(wp?.lastPracticedAt)}</td>
                       <td className="p-2 text-center">{wp?.attempts ? fmt(wp?.nextReviewAt) : '—'}</td>
                       <td className="p-2 text-center">{last ? (last.result === 'independent' ? 'עבר לבד' : last.result === 'with_help' ? 'עם עזרה' : 'לא הצליח') : 'עוד לא בוצעה'}</td>
+                      {showSpelling && <td className="p-2 text-center" data-testid={`spell-${w.id}`}>{spellingHe(wp)}</td>}
                     </tr>
                   );
                 })}
@@ -196,7 +227,8 @@ export function ParentsScreen() {
             <p><b>זוהתה בעזרת רמז</b> — הילד הגיע לתשובה נכונה אחרי רמז או אחרי ניסיון שגוי. ההתקדמות במשחק ממשיכה, אבל המילה מסומנת לתרגול עצמאי.</p>
             <p><b>זוהתה בהקשר חדש</b> — זיהוי ללא רמז במשימה, בבדיקת החייזר או בחזרה, עם תמונות שונות מאלה של שלב הלימוד.</p>
             <p><b>נבדקה בחזרה מאוחרת</b> — רק אחרי שעברו לפחות 4 שעות מהתרגול האחרון והמילה הגיעה למועד החזרה שלה. מילה לא מסומנת כ"נזכרת לאורך זמן" לפני שבדיקה כזו בוצעה בפועל.</p>
-            <p><b>מגבלות:</b> המדדים מבוססים רק על בחירות במשחק (זיהוי משמעות ובחירה מתוך אפשרויות). הם אינם בודקים הגייה, קריאה או כתיבה עצמאית באנגלית, ואינם אבחון. מספר הניסיונות קטן, ולכן הנתונים מתארים מגמה ולא רמת ידיעה מדויקת. כשכמה ילדים משחקים באותו מכשיר, הנתונים מתערבבים.</p>
+            <p><b>הרכבה מאותיות (רמת מפקדי חלל)</b> — הפקה עצמאית: הילד רואה תמונה ומילה בעברית ומרכיב את המילה באנגלית. נמדדת בנפרד מזיהוי, ואינה משנה את מצב הזיהוי של המילה.</p>
+            <p><b>מגבלות:</b> המדדים מבוססים רק על פעולות במשחק: זיהוי משמעות, בחירה מתוך אפשרויות, וברמה 3 גם הרכבת מילה מאותיות נתונות. הם אינם בודקים הגייה, קריאה חופשית או כתיבה בלי אותיות נתונות, ואינם אבחון. מספר הניסיונות קטן, ולכן הנתונים מתארים מגמה ולא רמת ידיעה מדויקת. כשכמה ילדים משחקים באותו מכשיר, הנתונים מתערבבים.</p>
           </section>
 
           <section className="card p-5 flex flex-col gap-3 text-base">

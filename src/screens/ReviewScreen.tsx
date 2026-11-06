@@ -29,7 +29,7 @@ function buildReviewQuestion(wordId: string, d: SaveData, audioWorks: boolean): 
 }
 
 /**
- * The review is part of the story ("Zibi's memory machine needs words"),
+ * The review is part of the story ("Kosmo's memory machine needs words"),
  * not a separate test. Only words that were really due count as delayed reviews.
  */
 export function ReviewScreen({ mode }: { mode: 'due' | 'practice' }) {
@@ -84,7 +84,7 @@ export function ReviewScreen({ mode }: { mode: 'due' | 'practice' }) {
                 <span key={k} className="w-6 h-6 rounded-full border-2 border-ink" style={{ background: k < i ? '#ffd23f' : '#e3dcff' }} />
               ))}
             </div>
-            <span className="font-bold">מכונת הזיכרון של זיבי</span>
+            <span className="font-bold">מכונת הזיכרון של קוסמו</span>
           </div>
           <ChoiceQuestion
             question={q}

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { MissionDef, UnitDef } from '../../engine/types';
+import type { MissionDef, MissionStepDef, UnitDef } from '../../engine/types';
+import { inLevel } from '../../content/levels';
+import { levelOfGame } from '../../engine/gameProgress';
 import { ItemArt } from '../../components/ItemArt';
 import { AlienStage, BigButton, EnglishWord } from '../../components/ui';
 import { IconArrowLeft, IconLock } from '../../components/Icons';
-import { MISSIONS_BY_ID, UNITS_BY_ID } from '../../content/units';
+import { MISSIONS_BY_ID, UNITS_BY_ID, unitWordIds } from '../../content/units';
 import { item } from '../../content/items';
 import { buildMissionQuestion } from '../../engine/tasks';
 import { completeUnit } from '../../engine/gameProgress';
@@ -19,9 +21,9 @@ const SCENE_TITLE: Record<MissionDef['scene'], string> = {
   door: 'הדרך לחדר הבקרה',
 };
 
-export function MissionScene({ m, doneCount, finished = false }: { m: MissionDef; doneCount: number; finished?: boolean }) {
-  const done = m.steps.slice(0, doneCount);
-  const collect = m.steps.filter((s) => s.effect.type === 'collect');
+export function MissionScene({ m, steps, doneCount, finished = false }: { m: MissionDef; steps: MissionStepDef[]; doneCount: number; finished?: boolean }) {
+  const done = steps.slice(0, doneCount);
+  const collect = steps.filter((s) => s.effect.type === 'collect');
   const stateStep = [...done].reverse().find((s) => s.effect.type === 'state');
   const doorState = stateStep && stateStep.effect.type === 'state' ? stateStep.effect.state : 'closed';
   const hasKey = done.some((s) => s.answer.kind === 'key');
@@ -30,7 +32,7 @@ export function MissionScene({ m, doneCount, finished = false }: { m: MissionDef
       <div className="flex items-center justify-between mb-2">
         <p className="font-extrabold text-lg">{SCENE_TITLE[m.scene]}</p>
         <p className="text-sm font-bold text-ink-soft">
-          {doneCount}/{m.steps.length}
+          {doneCount}/{steps.length}
         </p>
       </div>
       <div className="flex items-end gap-3">
@@ -83,10 +85,12 @@ export function MissionScene({ m, doneCount, finished = false }: { m: MissionDef
 export function PlayStep({ missionId, unit, onDone, onGoToStep }: { missionId: string; unit: UnitDef; onDone: () => void; onGoToStep: (stepId: string) => void }) {
   const { data, update } = useGame();
   const m = MISSIONS_BY_ID[missionId];
+  const level = levelOfGame(data.game);
+  const [steps] = useState(() => m.steps.filter((s) => inLevel(s.minLevel, level)));
   const [i, setI] = useState(0);
   const [phase, setPhase] = useState<'intro' | 'steps' | 'done'>('intro');
   const hasAbility = !m.requiredAbility || data.alien.abilities.includes(m.requiredAbility);
-  const q = useMemo(() => buildMissionQuestion(m.steps[i], { variant: i + data.attempts.length, taskId: `${m.id}:${m.steps[i].id}` }), [i]); // eslint-disable-line react-hooks/exhaustive-deps
+  const q = useMemo(() => buildMissionQuestion(steps[i], { variant: i + data.attempts.length, taskId: `${m.id}:${steps[i].id}` }), [i]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (phase !== 'done') return;
@@ -108,7 +112,7 @@ export function PlayStep({ missionId, unit, onDone, onGoToStep }: { missionId: s
         <AlienStage mood="confused" text="אוי, עוד לא למדתי מספיק כדי לעשות את המשימה הזאת. תלמדו אותי קודם?" />
         {teachStep && (
           <div className="flex justify-end">
-            <BigButton onClick={() => onGoToStep(teachStep.id)}>בואו נלמד את זיבי</BigButton>
+            <BigButton onClick={() => onGoToStep(teachStep.id)}>בואו נלמד את קוסמו</BigButton>
           </div>
         )}
       </div>
@@ -119,10 +123,10 @@ export function PlayStep({ missionId, unit, onDone, onGoToStep }: { missionId: s
     return (
       <div className="flex flex-col gap-4" data-testid="mission-intro">
         <AlienStage mood="curious" text={m.introHe} />
-        <MissionScene m={m} doneCount={0} />
+        <MissionScene m={m} steps={steps} doneCount={0} />
         <div className="card p-4 flex flex-wrap gap-2 items-center justify-center">
           <span className="font-bold">במשימה נשתמש במילים:</span>
-          {[...new Set(m.steps.flatMap((s) => s.wordIds))].map((w) => (
+          {[...new Set(steps.flatMap((s) => s.wordIds))].map((w) => (
             <span key={w} className="rounded-full bg-lab border-2 border-line px-3 py-1">
               <bdi className="en text-primary-dark" dir="ltr">{WORDS_BY_ID[w].english}</bdi> <span className="text-sm">{WORDS_BY_ID[w].hebrew}</span>
             </span>
@@ -140,7 +144,7 @@ export function PlayStep({ missionId, unit, onDone, onGoToStep }: { missionId: s
     return (
       <div className="flex flex-col gap-4" data-testid="mission-done">
         <AlienStage mood="success" text={`הצלחנו! ${m.rewardHe} תודה שעזרתם לי.`} />
-        <MissionScene m={m} doneCount={m.steps.length} finished />
+        <MissionScene m={m} steps={steps} doneCount={steps.length} finished />
         <div className="flex justify-end">
           <BigButton onClick={onDone} testId="next-btn">
             המשך <IconArrowLeft size={24} />
@@ -149,21 +153,21 @@ export function PlayStep({ missionId, unit, onDone, onGoToStep }: { missionId: s
       </div>
     );
 
-  const step = m.steps[i];
+  const step = steps[i];
   const ask = step.effect.type === 'collect' ? `אני צריך: ${step.promptEn}. איזה מהם לקחת?` : `${step.promptEn}! איך זה צריך להיראות אחרי?`;
   return (
     <div className="flex flex-col gap-3" data-testid="mission-step" data-step={step.id}>
-      <MissionScene m={m} doneCount={i} />
+      <MissionScene m={m} steps={steps} doneCount={i} />
       <ChoiceQuestion
         question={q}
         phase="learn"
         askLine={ask}
         successLine={() => step.doneHe}
         onComplete={() => {
-          if (i + 1 >= m.steps.length) setPhase('done');
+          if (i + 1 >= steps.length) setPhase('done');
           else setI(i + 1);
         }}
-        continueLabel={i + 1 >= m.steps.length ? 'סיום המשימה' : 'הבא'}
+        continueLabel={i + 1 >= steps.length ? 'סיום המשימה' : 'הבא'}
       />
     </div>
   );
@@ -178,10 +182,12 @@ export function SummaryStep({ unit, onFinish, onNextUnit }: { unit: UnitDef; onF
     playSfx('unlock');
   }, [unit.id, update]);
 
-  const met = unit.wordIds.filter((id) => data.learning[id]?.introduced);
-  const independent = unit.wordIds.filter((id) => (data.learning[id]?.independentCorrect ?? 0) > 0);
-  const practice = unit.wordIds.filter((id) => needsPractice(data.learning[id]));
-  const abilities = unit.wordIds
+  const unitWords = unitWordIds(unit, levelOfGame(data.game));
+  const met = unitWords.filter((id) => data.learning[id]?.introduced);
+  const independent = unitWords.filter((id) => (data.learning[id]?.independentCorrect ?? 0) > 0);
+  const spelled = unitWords.filter((id) => (data.learning[id]?.spellIndependent ?? 0) + (data.learning[id]?.spellWithHelp ?? 0) > 0);
+  const practice = unitWords.filter((id) => needsPractice(data.learning[id]));
+  const abilities = unitWords
     .map((id) => getWord(id).teach?.ability)
     .filter((a): a is NonNullable<typeof a> => !!a && data.alien.abilities.includes(a.id));
   const next = unit.unlocksUnitId ? UNITS_BY_ID[unit.unlocksUnitId] : null;
@@ -215,6 +221,16 @@ export function SummaryStep({ unit, onFinish, onNextUnit }: { unit: UnitDef; onF
             <p>בפעם הבאה ננסה לזהות לבד — כל ניסיון עוזר!</p>
           )}
         </section>
+        {spelled.length > 0 && (
+          <section className="card p-4">
+            <h3 className="font-extrabold text-lg mb-2">🔤 מילים שהרכבתם מאותיות</h3>
+            <div className="flex flex-wrap gap-2">
+              {spelled.map((id) => (
+                <WordChip key={id} id={id} />
+              ))}
+            </div>
+          </section>
+        )}
         <section className="card p-4">
           <h3 className="font-extrabold text-lg mb-2">🔁 כדאי לתרגל עוד</h3>
           {practice.length ? (
@@ -224,11 +240,11 @@ export function SummaryStep({ unit, onFinish, onNextUnit }: { unit: UnitDef; onF
               ))}
             </div>
           ) : (
-            <p>כרגע אין — אבל זיבי יבקש להיזכר במילים בפעם הבאה.</p>
+            <p>כרגע אין — אבל קוסמו יבקש להיזכר במילים בפעם הבאה.</p>
           )}
         </section>
         <section className="card p-4">
-          <h3 className="font-extrabold text-lg mb-2">👽 מה זיבי למד לעשות</h3>
+          <h3 className="font-extrabold text-lg mb-2">👽 מה קוסמו למד לעשות</h3>
           {abilities.length ? (
             abilities.map((a) => (
               <p key={a.id} className="text-lg font-bold">
@@ -236,7 +252,7 @@ export function SummaryStep({ unit, onFinish, onNextUnit }: { unit: UnitDef; onF
               </p>
             ))
           ) : (
-            <p>זיבי עדיין מתאמן.</p>
+            <p>קוסמו עדיין מתאמן.</p>
           )}
         </section>
       </div>

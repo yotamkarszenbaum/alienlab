@@ -5,7 +5,8 @@ import { dueWords, introduceWord, recordChoice, recordDelayedReview, recordWordA
 import { buildMissionQuestion, buildWordToPicture, reduceOptions } from '../src/engine/tasks';
 import { clearSave, loadSave, newSave, STORAGE_KEY, writeSave, type StorageLike } from '../src/engine/storage';
 import { getWord } from '../src/content/words';
-import { MISSIONS_BY_ID } from '../src/content/units';
+import { MISSIONS_BY_ID, UNITS_BY_ID, stepsFor } from '../src/content/units';
+import { stepIndexOf } from '../src/engine/gameProgress';
 
 const T0 = 1_800_000_000_000;
 
@@ -113,12 +114,26 @@ describe('storage', () => {
   });
   it('partial / invalid fields are repaired', () => {
     const s = memStorage();
-    s.setItem(STORAGE_KEY, JSON.stringify({ version: 1, game: { unitStep: { earth: 999, nope: 3 }, completedUnits: ['earth'], unlockedUnits: [] } }));
+    s.setItem(STORAGE_KEY, JSON.stringify({ version: 2, game: { level: 7, doneSteps: { earth: ['apple-discover', 'bogus'], nope: ['x'] }, completedUnits: ['earth'], unlockedUnits: [] } }));
     const r = loadSave(T0, s);
-    expect(r.data.game.unitStep.earth).toBe(11); // clamped to last step index
-    expect(r.data.game.unitStep).not.toHaveProperty('nope');
+    expect(r.data.game.doneSteps.earth).toEqual(['apple-discover']);
+    expect(r.data.game.doneSteps).not.toHaveProperty('nope');
+    expect(r.data.game.level).toBeNull(); // invalid level -> ask again
     expect(r.data.game.unlockedUnits).toEqual(['earth', 'colors']);
     expect(r.data.learning.apple.attempts).toBe(0);
+    expect(r.data.learning.car.spellIndependent).toBe(0); // new words get defaults
+  });
+  it('v1 save (step index, no levels) migrates to v2 without losing progress', () => {
+    const s = memStorage();
+    s.setItem(STORAGE_KEY, JSON.stringify({ version: 1, game: { introSeen: true, unitStep: { earth: 11, colors: 3 }, completedUnits: ['earth'], unlockedUnits: ['earth', 'colors'] }, learning: { apple: { introduced: true, attempts: 3, independentCorrect: 2 } } }));
+    const r = loadSave(T0, s);
+    expect(r.status).toBe('migrated');
+    expect(r.data.version).toBe(2);
+    expect(r.data.game.level).toBe(1);
+    expect(r.data.game.doneSteps.colors).toEqual(['red-discover', 'red-practice', 'blue-discover']);
+    expect(stepIndexOf(r.data.game, UNITS_BY_ID.colors)).toBe(3);
+    expect(stepIndexOf(r.data.game, UNITS_BY_ID.earth)).toBe(stepsFor(UNITS_BY_ID.earth, 1).length - 1); // summary
+    expect(r.data.learning.apple.independentCorrect).toBe(2);
   });
   it('old (v0) save is migrated', () => {
     const s = memStorage();

@@ -21,6 +21,9 @@ export function emptyWordProgress(): WordProgress {
     contextIndependent: 0,
     delayedReviews: [],
     recent: [],
+    spellIndependent: 0,
+    spellWithHelp: 0,
+    spellWrong: 0,
   };
 }
 
@@ -48,6 +51,14 @@ export const LEVEL_HE: Record<LearningLevel, string> = {
   applied_in_context: 'זוהתה בהקשר חדש',
   reviewed_later: 'נבדקה בחזרה מאוחרת',
 };
+
+/** Spelling (production) status, separate from recognition. */
+export function spellingHe(wp: WordProgress | undefined): string {
+  if (!wp || wp.spellIndependent + wp.spellWithHelp + wp.spellWrong === 0) return '—';
+  if (wp.spellIndependent > 0) return `איית לבד (${wp.spellIndependent})`;
+  if (wp.spellWithHelp > 0) return `איית בעזרה (${wp.spellWithHelp})`;
+  return 'בתרגול';
+}
 
 export const LEVEL_ORDER: LearningLevel[] = [
   'not_introduced',
@@ -100,6 +111,12 @@ export function isDueForReview(wp: WordProgress | undefined, now: number): boole
 
 /** Apply one attempt to the word's counters. */
 export function applyAttempt(wp: WordProgress, a: AttemptRecord): WordProgress {
+  // Production (spelling) is tracked separately and never changes recognition levels.
+  if (a.taskType === 'spell_word') {
+    if (a.outcome === 'wrong') return { ...wp, spellWrong: wp.spellWrong + 1 };
+    if (a.independent) return { ...wp, spellIndependent: wp.spellIndependent + 1 };
+    return { ...wp, spellWithHelp: wp.spellWithHelp + 1 };
+  }
   const next: WordProgress = { ...wp, attempts: wp.attempts + 1, lastPracticedAt: a.at };
   let mark: 'i' | 'h' | 'w' | null = null;
   if (a.outcome === 'wrong') {

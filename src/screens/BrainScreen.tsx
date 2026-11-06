@@ -2,7 +2,8 @@ import { AlienStage, EnglishWord, Page, TopBar } from '../components/ui';
 import { ItemArt } from '../components/ItemArt';
 import { useGame } from '../state/GameContext';
 import { useNav } from '../state/nav';
-import { UNITS } from '../content/units';
+import { UNITS, unitWordIds } from '../content/units';
+import { levelOfGame } from '../engine/gameProgress';
 import { getWord } from '../content/words';
 import { emptyConcept, guessLabelHe, understandingOf, UNDERSTANDING_HE } from '../engine/alienMind';
 import { AlienThought } from './steps/TeachStep';
@@ -15,7 +16,7 @@ export function BrainScreen() {
   const { go } = useNav();
   return (
     <>
-      <TopBar onHome={() => go({ name: 'lab' })} title="מה זיבי יודע?" />
+      <TopBar onHome={() => go({ name: 'lab' })} title="מה קוסמו יודע?" />
       <Page>
         <div className="flex flex-col gap-4" data-testid="brain-screen">
           <AlienStage mood="thinking" text="זה המוח שלי! כאן רואים כל מה שלמדתי מכם — וגם במה התבלבלתי." autoRead={false} />
@@ -23,7 +24,7 @@ export function BrainScreen() {
             <section key={u.id} className="card p-4 flex flex-col gap-3">
               <h2 className="text-xl font-extrabold">{u.titleHe}</h2>
               <div className="grid sm:grid-cols-2 gap-3 items-start">
-                {u.wordIds.map((id) => {
+                {unitWordIds(u, levelOfGame(data.game)).map((id) => {
                   const w = getWord(id);
                   const k = data.alien.concepts[id] ?? emptyConcept(id);
                   const u2 = understandingOf(w.target, k);

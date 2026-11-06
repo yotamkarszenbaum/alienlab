@@ -88,6 +88,22 @@ function helpers(page) {
     await click('[data-testid=next-btn]');
   }
 
+  async function doSpell() {
+    const s0 = await stepId();
+    for (let g = 0; g < 6; g++) {
+      if ((await stepId()) !== s0) return;
+      for (let k = 0; k < 8; k++) {
+        if ((await page.getAttribute('[data-testid=next-btn]', 'aria-disabled')) !== 'true') break;
+        const nxt = page.locator('[data-testid=spell-tiles] button[data-next=true]').first();
+        if (!(await nxt.count())) break;
+        await nxt.click();
+        await sleep(300);
+      }
+      await sleep(600);
+      await click('[data-testid=next-btn]');
+    }
+  }
+
   async function playUnit(hooks = {}) {
     for (let g = 0; g < 40; g++) {
       const id = await stepId();
@@ -100,6 +116,7 @@ function helpers(page) {
       if (type === 'discover') await click('[data-testid=next-btn]');
       else if (type === 'practice' || type === 'sentence') await answerQuestions();
       else if (type === 'teach') await doTeach();
+      else if (type === 'spell') await doSpell();
       else if (type === 'play') await doMission();
       else if (type === 'summary') return;
     }
@@ -107,11 +124,12 @@ function helpers(page) {
   return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, playUnit };
 }
 
-async function startNewGame(page, h) {
+async function startNewGame(page, h, level = 1) {
   await page.goto(BASE_URL);
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await h.click('[data-testid=start-btn]');
+  await h.click(`[data-testid=level-${level}]`);
   await h.click('[data-testid=intro-next]');
   await h.click('[data-testid=intro-next]');
   await h.click('[data-testid=intro-start]');
@@ -144,12 +162,16 @@ const inputsOnHome = await page.locator('input, textarea, select').count();
 const hasStart = await h.exists('[data-testid=start-btn]');
 await page.screenshot({ path: SHOTS + 'd01-home.png' });
 await h.click('[data-testid=start-btn]');
+const levelScreen = await h.exists('[data-testid=level-screen]');
+const levelInputs = await page.locator('input, textarea, select').count();
+await page.screenshot({ path: SHOTS + 'd01b-level.png', fullPage: true });
+await h.click('[data-testid=level-1]');
 await page.screenshot({ path: SHOTS + 'd02-intro.png' });
 await h.click('[data-testid=intro-next]');
 await h.click('[data-testid=intro-next]');
 await h.click('[data-testid=intro-start]');
 const inLab = await h.exists('[data-testid=lab-screen]');
-record(1, 'פתיחת משחק חדש', 'דפדפן נקי, ללא שמירה', 'כניסה → "התחל משחק" → היכרות → "בואו נתחיל"', 'הגעה למעבדה בלי הרשמה ובלי שדות קלט', `כפתור התחלה: ${hasStart}, שדות קלט במסך הפתיחה: ${inputsOnHome}, הגיע למעבדה: ${inLab}`, hasStart && inputsOnHome === 0 && inLab);
+record(1, 'פתיחת משחק חדש', 'דפדפן נקי, ללא שמירה', 'כניסה → "התחל משחק" → בחירת רמה לפי טווח גילים → היכרות → "בואו נתחיל"', 'הגעה למעבדה בלי הרשמה ובלי שדות קלט', `כפתור התחלה: ${hasStart}, שדות קלט במסך הפתיחה ובבחירת הרמה: ${inputsOnHome + levelInputs}, מסך בחירת רמה (ללא שאלת גיל מדויק): ${levelScreen}, הגיע למעבדה: ${inLab}`, hasStart && inputsOnHome === 0 && levelInputs === 0 && levelScreen && inLab);
 await page.screenshot({ path: SHOTS + 'd03-lab.png' });
 
 // ---- Section 15: locked unit
@@ -216,7 +238,7 @@ await h.click('[data-testid=options] button[data-correct=false]');
 const wrongLine = await h.text('[data-testid=alien-line]');
 const stillHere = (await h.stepId()) === stepBefore;
 const saveAfter = await h.save();
-record(6, 'תרגול שגוי', 'תרגול CAT', 'בחירה בתמונה שגויה', 'אין פסילה ואין חזרה להתחלה', `נשאר בשלב ${stepBefore}: ${stillHere}, משוב: "${wrongLine}", התקדמות היחידה לא השתנתה: ${saveBefore.game.unitStep.earth === saveAfter.game.unitStep.earth}`, stillHere && wrongLine.includes('לא נורא') && saveBefore.game.unitStep.earth === saveAfter.game.unitStep.earth);
+record(6, 'תרגול שגוי', 'תרגול CAT', 'בחירה בתמונה שגויה', 'אין פסילה ואין חזרה להתחלה', `נשאר בשלב ${stepBefore}: ${stillHere}, משוב: "${wrongLine}", התקדמות היחידה לא השתנתה: ${JSON.stringify(saveBefore.game.doneSteps) === JSON.stringify(saveAfter.game.doneSteps)}`, stillHere && wrongLine.includes('לא נורא') && JSON.stringify(saveBefore.game.doneSteps) === JSON.stringify(saveAfter.game.doneSteps));
 await page.screenshot({ path: SHOTS + 'd06-wrong.png', fullPage: true });
 const lvl1 = await page.getAttribute('[data-testid=hint-panel]', 'data-level');
 const line1 = await h.text('[data-testid=alien-line]');
@@ -286,7 +308,7 @@ await h.playUnit({
     await h.click('[data-testid=teach-pool] button[data-testid="opt-apple.red.normal.none"]');
     const guessAfter = await page.getAttribute('[data-testid=alien-thought]', 'data-guess');
     const s1 = await h.save();
-    record(10, 'לימוד החייזר', 'מסך "ללמד את זיבי" RED, החייזר לא יודע דבר', 'בחירת תפוח אדום כדוגמה', 'מצב הידע הפנימי מתעדכן', `השערה לפני: "${guessBefore}", אחרי: "${guessAfter}", דוגמאות שמורות: ${JSON.stringify(s1.alien.concepts.red.examples)}`, guessBefore === '' && guessAfter === 'kind:apple' && s1.alien.concepts.red.examples[0] === 'apple.red.normal.none');
+    record(10, 'לימוד החייזר', 'מסך "ללמד את קוסמו" RED, החייזר לא יודע דבר', 'בחירת תפוח אדום כדוגמה', 'מצב הידע הפנימי מתעדכן', `השערה לפני: "${guessBefore}", אחרי: "${guessAfter}", דוגמאות שמורות: ${JSON.stringify(s1.alien.concepts.red.examples)}`, guessBefore === '' && guessAfter === 'kind:apple' && s1.alien.concepts.red.examples[0] === 'apple.red.normal.none');
     // Test 11: partial understanding
     const und = await page.getAttribute('[data-testid=alien-thought]', 'data-understanding');
     record(11, 'הבנה חלקית', 'אחרי דוגמה אחת (תפוח אדום)', 'בדיקת מצב ההבנה', 'מצב מוגדר מראש של הבנה חלקית/שגויה', `RED אחרי תפוח אדום: ${und} ("RED = תפוח"); DOG אחרי כלב חום אחד: ${dogUnderstanding}`, und === 'misconception' && dogUnderstanding === 'partial');
@@ -429,6 +451,21 @@ await h.click('[data-testid=brain-btn]');
 await page.screenshot({ path: SHOTS + 'd22-brain.png', fullPage: true });
 await h.click('[data-testid=home-btn]');
 
+// ---- Levels: raising the level mid-game adds the new words, nothing is lost
+await gotoParents(page, h);
+await h.click('[data-testid=parent-level-2]');
+await h.click('[data-testid=home-btn]');
+await h.click('[data-testid=continue-btn]');
+const chip = await h.text('[data-testid=level-chip]');
+const newBadges = await page.locator('[data-testid^=new-words-]').count();
+await page.screenshot({ path: SHOTS + 'd23-lab-level2.png', fullPage: true });
+await h.click('[data-testid=station-earth]');
+const firstNew = await h.stepId();
+await h.playUnit();
+const sL2 = await h.save();
+note('העלאת רמה באמצע המשחק (1→2)', `תג רמה: "${chip.trim()}"; תחנות עם "מילים חדשות": ${newBadges}; השלב הבא ביחידה 1: ${firstNew}; CAR נלמדה: ${sL2.learning.car.introduced}; יחידות שהושלמו נשמרו: ${sL2.game.completedUnits.length}`, chip.includes('חוקרי חלל') && newBadges === 3 && firstNew === 'car-discover' && sL2.learning.car.introduced && sL2.game.completedUnits.length === 3);
+await h.click('[data-testid=back-to-lab]');
+
 // ---- Test 20: reset
 await gotoParents(page, h);
 await h.click('[data-testid=reset-btn]');
@@ -454,6 +491,7 @@ record(19, 'תפעול ללא גרירה', 'כל הריצה', 'כל המשימו
 
 // ---- Section 15: browser back goes to a safe screen
 await h.click('[data-testid=start-btn]');
+await h.click('[data-testid=level-1]');
 await h.click('[data-testid=intro-next]');
 await h.click('[data-testid=intro-next]');
 await h.click('[data-testid=intro-start]');
@@ -505,6 +543,86 @@ record(4, 'השמעת מילה', 'מסך גילוי APPLE', 'לחיצה על כ�
 await ctxVoice.close();
 
 // =========================================================================
+// Level 3 (ages 10–12): extra words + building words from letters
+// =========================================================================
+const ctx3 = await browser.newContext({ viewport: { width: 1180, height: 900 } });
+const p3 = await ctx3.newPage();
+const p3errors = [];
+p3.on('pageerror', (e) => p3errors.push(e.message));
+const h3 = helpers(p3);
+await startNewGame(p3, h3, 3);
+await h3.click('[data-testid=station-earth]');
+const seen3 = [];
+let spellInfo = null;
+await h3.playUnit({
+  each: async (id) => seen3.push(id),
+  'earth-spell': async () => {
+    await p3.screenshot({ path: SHOTS + 'd24-spell.png', fullPage: true });
+    // word 1 (CAT): build it wrong first -> hint, green letters kept
+    const target = (await p3.getAttribute('[data-testid=spell-word]', 'data-word')).toUpperCase();
+    const tiles = await p3.locator('[data-testid=spell-tiles] button').evaluateAll((b) => b.map((x) => x.dataset.testid.replace('tile-', '')));
+    const wrongFirst = tiles.find((c) => !target.includes(c));
+    await h3.click(`[data-testid=tile-${wrongFirst}]`, 250);
+    for (const c of target.slice(1)) await h3.click(`[data-testid=spell-tiles] [data-testid=tile-${c}]:not([disabled])`, 250);
+    await sleep(600);
+    const hintLevel = await p3.getAttribute('[data-testid=hint-panel]', 'data-level');
+    const greenKept = await p3.locator('[data-testid=spell-slots] .border-good').count();
+    await p3.screenshot({ path: SHOTS + 'd25-spell-hint.png', fullPage: true });
+    // now the remaining letters in order
+    for (let g = 0; g < 8; g++) {
+      if ((await p3.getAttribute('[data-testid=next-btn]', 'aria-disabled')) !== 'true') break;
+      const nxt = p3.locator('[data-testid=spell-tiles] button[data-next=true]').first();
+      if (!(await nxt.count())) break;
+      await nxt.click();
+      await sleep(450);
+    }
+    await sleep(500);
+    const doneLine = await h3.text('[data-testid=alien-line]');
+    await h3.click('[data-testid=next-btn]');
+    // words 2 and 3 correctly on the first try
+    for (let w = 0; w < 2; w++) {
+      const t = (await p3.getAttribute('[data-testid=spell-word]', 'data-word')).toUpperCase();
+      for (const c of t) await h3.click(`[data-testid=spell-tiles] [data-testid=tile-${c}]:not([disabled])`, 250);
+      await sleep(700);
+      await h3.click('[data-testid=next-btn]');
+    }
+    const s = await h3.save();
+    spellInfo = { target, hintLevel, greenKept, doneLine, cat: s.learning.cat, dog: s.learning.dog };
+  },
+});
+const s3 = await h3.save();
+note('רמה 3: מילים נוספות ביחידה 1', `שלבים ששוחקו כוללים: ${['car-discover', 'cup-discover', 'earth-spell'].filter((x) => seen3.includes(x)).join(', ')}; מילים שנחשפו ביחידה: ${['apple', 'ball', 'cat', 'dog', 'car', 'cup'].filter((w) => s3.learning[w].introduced).length}/6`, seen3.includes('car-discover') && seen3.includes('cup-discover') && seen3.includes('earth-spell'));
+note('רמה 3: הרכבת מילה מאותיות + רמז', `מילה: ${spellInfo?.target}; אחרי הרכבה שגויה: רמז ברמה ${spellInfo?.hintLevel}, אותיות ירוקות שנשארו: ${spellInfo?.greenKept}; סיום: "${spellInfo?.doneLine}"`, spellInfo?.hintLevel === '1' && spellInfo.greenKept === spellInfo.target.length - 1);
+note('הרכבה נשמרת בנפרד מזיהוי', `CAT: איות שגוי ${spellInfo?.cat.spellWrong}, איות בעזרה ${spellInfo?.cat.spellWithHelp}; DOG: איות לבד ${spellInfo?.dog.spellIndependent}; שגיאות הזיהוי של CAT לא השתנו: ${spellInfo?.cat.wrong === 0}`, spellInfo?.cat.spellWrong === 1 && spellInfo.cat.spellWithHelp === 1 && spellInfo.dog.spellIndependent === 1 && spellInfo.cat.wrong === 0);
+await gotoParents(p3, h3);
+const spellCol = await h3.text('[data-testid=spell-dog]');
+const exposed3 = await p3.evaluate(() => document.querySelector('[data-testid=stat-exposed]').textContent);
+await p3.screenshot({ path: SHOTS + 'd26-parents-level3.png', fullPage: true });
+note('אזור הורים ברמה 3', `עמודת הרכבה ל-DOG: "${spellCol}"; ${exposed3.replace(/\s+/g, ' ')}`, spellCol.includes('לבד') && exposed3.includes('מתוך 18'));
+note('שגיאות JavaScript ברמה 3', p3errors.length ? p3errors.join(' | ') : 'אין', p3errors.length === 0);
+await ctx3.close();
+
+// ---- Old (v1) save from the first version of the game still loads
+const ctxOld = await browser.newContext({ viewport: { width: 1180, height: 900 } });
+const po = await ctxOld.newPage();
+const ho = helpers(po);
+await po.goto(BASE_URL);
+await po.evaluate(() =>
+  localStorage.setItem(
+    'alienlab:save',
+    JSON.stringify({ version: 1, createdAt: 1, game: { introSeen: true, unitStep: { earth: 11, colors: 2 }, completedUnits: ['earth'], unlockedUnits: ['earth', 'colors'] }, learning: { apple: { introduced: true, attempts: 2, independentCorrect: 2 } } }),
+  ),
+);
+await po.reload();
+await ho.click('[data-testid=continue-btn]');
+const oldChip = await ho.text('[data-testid=level-chip]');
+const oldEarth = await po.getAttribute('[data-testid=station-earth]', 'data-status');
+await ho.click('[data-testid=station-colors]');
+const oldStep = await ho.stepId();
+note('שמירה מהגרסה הקודמת (v1) נטענת', `רמה: "${oldChip.trim()}"; יחידה 1: ${oldEarth}; יחידה 2 ממשיכה מ-${oldStep}`, oldChip.includes('צוערי חלל') && oldEarth === 'completed' && oldStep === 'blue-discover');
+await ctxOld.close();
+
+// =========================================================================
 // Test 18: phone layout (iPhone-size viewport, touch)
 // =========================================================================
 const mob = await browser.newContext({ viewport: { width: 375, height: 740 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
@@ -531,6 +649,9 @@ await sleep(500);
 await checkLayout('home');
 await pm.screenshot({ path: SHOTS + 'm01-home.png', fullPage: true });
 await hm.click('[data-testid=start-btn]');
+await checkLayout('level');
+await pm.screenshot({ path: SHOTS + 'm01b-level.png', fullPage: true });
+await hm.click('[data-testid=level-1]');
 await checkLayout('intro');
 await hm.click('[data-testid=intro-next]');
 await hm.click('[data-testid=intro-next]');
@@ -569,6 +690,15 @@ await hm.playUnit({
 });
 await gotoParents(pm, hm);
 await checkLayout('parents');
+// spelling step on a phone
+await startNewGame(pm, hm, 3);
+await checkLayout('lab-level3');
+await hm.click('[data-testid=station-earth]');
+await hm.playUnit({ 'earth-spell': async () => {
+  await checkLayout('earth-spell');
+  await pm.screenshot({ path: SHOTS + `m${String(shotN++).padStart(2, '0')}-spell.png`, fullPage: true });
+  await hm.click('[data-testid=home-btn]');
+} , each: async (id) => { if (!(await hm.exists('[data-testid=unit-screen]'))) throw new Error('left'); } }).catch(() => {});
 await pm.screenshot({ path: SHOTS + `m${String(shotN++).padStart(2, '0')}-parents.png`, fullPage: true });
 record(18, 'תצוגת נייד', 'מסך 375×740 עם מגע', 'מעבר על כל המסכים של יחידות 1–2 ואזור ההורים', 'בלי גלילה אופקית ובלי כפתורים חסומים/קטנים', `גלילה אופקית: ${overflow.length ? overflow.join(', ') : 'אין'}; כפתורים קטנים מ-44px או חתוכים: ${tooSmall.size ? [...tooSmall].slice(0, 6).join(' | ') : 'אין'}`, overflow.length === 0 && tooSmall.size === 0);
 await mob.close();

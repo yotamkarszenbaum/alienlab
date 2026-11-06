@@ -3,6 +3,7 @@ import { createContext, useContext } from 'react';
 export type Screen =
   | { name: 'home' }
   | { name: 'intro' }
+  | { name: 'level' }
   | { name: 'lab'; message?: string }
   | { name: 'unit'; unitId: string }
   | { name: 'review'; mode: 'due' | 'practice' }
@@ -28,6 +29,7 @@ export function parentOf(s: Screen): Screen | null {
     case 'home':
       return null;
     case 'intro':
+    case 'level':
     case 'lab':
     case 'parents':
       return { name: 'home' };

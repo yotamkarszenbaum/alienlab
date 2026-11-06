@@ -1,4 +1,4 @@
-// The alien "Zibi" — one consistent SVG character with 7 moods.
+// The alien "Kosmo" (קוסמו) — one consistent SVG character with 7 moods.
 export type AlienMood = 'neutral' | 'curious' | 'happy' | 'thinking' | 'confused' | 'discovery' | 'success';
 
 const OUT = '#2b2350';
@@ -157,7 +157,7 @@ export function Alien({ mood = 'neutral', size = 160, className = '' }: { mood?:
       height={typeof size === 'number' ? size * 1.125 : size}
       className={`alien alien--${mood} ${className}`}
       role="img"
-      aria-label={`החייזר זיבי (${MOOD_HE[mood]})`}
+      aria-label={`החייזר קוסמו (${MOOD_HE[mood]})`}
     >
       <g className="alien-body">
         {/* antennae */}

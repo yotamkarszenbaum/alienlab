@@ -1,15 +1,17 @@
-import type { MissionDef, SentenceDef, StepDef, UnitDef } from '../engine/types';
+import type { Level, MissionDef, SentenceDef, StepDef, UnitDef } from '../engine/types';
+import { inLevel } from './levels';
 import { item } from './items';
+import { WORDS_BY_ID } from './words';
 
 // ---------------------------------------------------------------------------
 // Units, step sequences, sentences and missions. All data-driven: the step
 // runner reads these arrays and never hard-codes words.
 // ---------------------------------------------------------------------------
 
-function wordSteps(wordId: string): StepDef[] {
+function wordSteps(wordId: string, minLevel?: Level): StepDef[] {
   return [
-    { id: `${wordId}-discover`, type: 'discover', wordId },
-    { id: `${wordId}-practice`, type: 'practice', questions: [{ id: `${wordId}-q1`, mode: 'word_to_picture', wordId }] },
+    { id: `${wordId}-discover`, type: 'discover', wordId, minLevel },
+    { id: `${wordId}-practice`, type: 'practice', questions: [{ id: `${wordId}-q1`, mode: 'word_to_picture', wordId }], minLevel },
   ];
 }
 
@@ -21,13 +23,15 @@ export const UNITS: UnitDef[] = [
     subtitleHe: 'חפצים ובעלי חיים',
     icon: [item('apple', 'red'), item('ball', 'blue'), item('cat', 'orange')],
     accent: '#22b8a0',
-    wordIds: ['apple', 'ball', 'cat', 'dog'],
+    wordIds: ['apple', 'ball', 'cat', 'dog', 'car', 'cup'],
     unlocksUnitId: 'colors',
     steps: [
       ...wordSteps('apple'),
       ...wordSteps('ball'),
       ...wordSteps('cat'),
       ...wordSteps('dog'),
+      ...wordSteps('car', 2),
+      ...wordSteps('cup', 3),
       {
         id: 'earth-mix',
         type: 'practice',
@@ -36,8 +40,10 @@ export const UNITS: UnitDef[] = [
           { id: 'earth-mix-1', mode: 'picture_to_word', wordId: 'cat' },
           { id: 'earth-mix-2', mode: 'word_to_picture', wordId: 'ball' },
           { id: 'earth-mix-3', mode: 'picture_to_word', wordId: 'apple' },
+          { id: 'earth-mix-4', mode: 'picture_to_word', wordId: 'car', minLevel: 2 },
         ],
       },
+      { id: 'earth-spell', type: 'spell', wordIds: ['cat', 'dog', 'cup'], minLevel: 3 },
       { id: 'teach-dog', type: 'teach', conceptId: 'dog' },
       { id: 'play-supply', type: 'play', missionId: 'm-supply' },
       { id: 'earth-summary', type: 'summary' },
@@ -50,13 +56,15 @@ export const UNITS: UnitDef[] = [
     subtitleHe: 'אדום, כחול, צהוב וגדול',
     icon: [item('ball', 'red'), item('cup', 'blue'), item('star', 'yellow')],
     accent: '#7c5cff',
-    wordIds: ['red', 'blue', 'yellow', 'big'],
+    wordIds: ['red', 'blue', 'yellow', 'big', 'green', 'small'],
     unlocksUnitId: 'lab',
     steps: [
       ...wordSteps('red'),
       ...wordSteps('blue'),
       ...wordSteps('yellow'),
       ...wordSteps('big'),
+      ...wordSteps('green', 2),
+      ...wordSteps('small', 3),
       {
         id: 'colors-mix',
         type: 'practice',
@@ -65,8 +73,11 @@ export const UNITS: UnitDef[] = [
           { id: 'colors-mix-1', mode: 'word_to_picture', wordId: 'yellow' },
           { id: 'colors-mix-2', mode: 'picture_to_word', wordId: 'red' },
           { id: 'colors-mix-3', mode: 'picture_to_word', wordId: 'blue' },
+          { id: 'colors-mix-4', mode: 'word_to_picture', wordId: 'green', minLevel: 2 },
+          { id: 'colors-mix-5', mode: 'picture_to_word', wordId: 'small', minLevel: 3 },
         ],
       },
+      { id: 'colors-spell', type: 'spell', wordIds: ['red', 'big', 'blue'], minLevel: 3 },
       { id: 'teach-red', type: 'teach', conceptId: 'red' },
       { id: 'teach-big', type: 'teach', conceptId: 'big' },
       { id: 'play-colors', type: 'play', missionId: 'm-colors' },
@@ -80,12 +91,14 @@ export const UNITS: UnitDef[] = [
     subtitleHe: 'מפתח, דלת, לפתוח ולסגור',
     icon: [item('key', 'yellow'), item('door', 'purple', 'normal', 'closed')],
     accent: '#ff8a3d',
-    wordIds: ['key', 'door', 'open', 'close'],
+    wordIds: ['key', 'door', 'open', 'close', 'box', 'star'],
     steps: [
       ...wordSteps('key'),
       ...wordSteps('door'),
       ...wordSteps('open'),
       ...wordSteps('close'),
+      ...wordSteps('box', 2),
+      ...wordSteps('star', 3),
       {
         id: 'sentence-open-door',
         type: 'sentence',
@@ -95,6 +108,7 @@ export const UNITS: UnitDef[] = [
           { id: 'sentence-q2', mode: 'sentence_to_picture', sentenceId: 'open-the-door' },
         ],
       },
+      { id: 'lab-spell', type: 'spell', wordIds: ['key', 'door', 'star'], minLevel: 3 },
       { id: 'teach-open', type: 'teach', conceptId: 'open' },
       { id: 'play-door', type: 'play', missionId: 'm-door' },
       { id: 'lab-summary', type: 'summary' },
@@ -184,6 +198,28 @@ export const MISSIONS: MissionDef[] = [
         effect: { type: 'collect' },
         doneHe: 'DOG! גם הכלב מצטרף. הב הב!',
       },
+      {
+        id: 's5',
+        minLevel: 2,
+        promptEn: 'CAR',
+        promptHe: 'מכונית',
+        wordIds: ['car'],
+        answer: item('car', 'yellow'),
+        distractors: [item('ball', 'yellow'), item('cat', 'orange'), item('cup', 'blue')],
+        effect: { type: 'collect' },
+        doneHe: 'CAR! מכונית קטנה לנסוע בה על הירח.',
+      },
+      {
+        id: 's6',
+        minLevel: 3,
+        promptEn: 'CUP',
+        promptHe: 'כוס',
+        wordIds: ['cup'],
+        answer: item('cup', 'green'),
+        distractors: [item('apple', 'green'), item('ball', 'green'), item('car', 'green')],
+        effect: { type: 'collect' },
+        doneHe: 'CUP! עכשיו יש לי ממה לשתות בחלל.',
+      },
     ],
   },
   {
@@ -225,6 +261,28 @@ export const MISSIONS: MissionDef[] = [
         distractors: [item('dog', 'brown', 'small'), item('cat', 'orange', 'big'), item('cat', 'gray', 'small')],
         effect: { type: 'collect' },
         doneHe: 'BIG DOG — כלב גדול! הוא בקושי נכנס.',
+      },
+      {
+        id: 'c5',
+        minLevel: 2,
+        promptEn: 'GREEN CAR',
+        promptHe: 'מכונית ירוקה',
+        wordIds: ['green', 'car'],
+        answer: item('car', 'green'),
+        distractors: [item('car', 'red'), item('ball', 'green'), item('car', 'yellow')],
+        effect: { type: 'collect' },
+        doneHe: 'GREEN CAR — מכונית ירוקה! המכונה אוהבת ירוק.',
+      },
+      {
+        id: 'c6',
+        minLevel: 3,
+        promptEn: 'SMALL DOG',
+        promptHe: 'כלב קטן',
+        wordIds: ['small', 'dog'],
+        answer: item('dog', 'brown', 'small'),
+        distractors: [item('dog', 'brown', 'big'), item('cat', 'gray', 'small'), item('dog', 'white', 'big')],
+        effect: { type: 'collect' },
+        doneHe: 'SMALL DOG — כלב קטן! הוא נכנס בקלות.',
       },
       {
         id: 'c4',
@@ -289,6 +347,28 @@ export const MISSIONS: MissionDef[] = [
         doneHe: 'BIG CAT — חתול גדול! הוא שומר על חדר הבקרה.',
       },
       {
+        id: 'd6',
+        minLevel: 2,
+        promptEn: 'BLUE BOX',
+        promptHe: 'קופסה כחולה',
+        wordIds: ['blue', 'box'],
+        answer: item('box', 'blue', 'normal', 'closed'),
+        distractors: [item('box', 'red', 'normal', 'closed'), item('door', 'blue', 'normal', 'closed'), item('cup', 'blue')],
+        effect: { type: 'collect' },
+        doneHe: 'BLUE BOX — קופסה כחולה! יש בה כלים למעבדה.',
+      },
+      {
+        id: 'd7',
+        minLevel: 3,
+        promptEn: 'YELLOW STAR',
+        promptHe: 'כוכב צהוב',
+        wordIds: ['yellow', 'star'],
+        answer: item('star', 'yellow'),
+        distractors: [item('star', 'purple'), item('ball', 'yellow'), item('key', 'yellow')],
+        effect: { type: 'collect' },
+        doneHe: 'YELLOW STAR — כוכב צהוב! הוא מאיר את חדר הבקרה.',
+      },
+      {
         id: 'd5',
         promptEn: 'CLOSE THE DOOR',
         promptHe: 'סגור את הדלת',
@@ -307,5 +387,14 @@ export const MISSIONS_BY_ID: Record<string, MissionDef> = Object.fromEntries(MIS
 export const SENTENCES_BY_ID: Record<string, SentenceDef> = Object.fromEntries(SENTENCES.map((s) => [s.id, s]));
 
 export const FIRST_UNIT_ID = UNITS[0].id;
+
+/** Steps of a unit that are part of the given level. */
+export function stepsFor(unit: UnitDef, level: Level | null | undefined): StepDef[] {
+  return unit.steps.filter((s) => inLevel(s.minLevel, level));
+}
+
+export function unitWordIds(unit: UnitDef, level: Level | null | undefined): string[] {
+  return unit.wordIds.filter((id) => inLevel(WORDS_BY_ID[id]?.minLevel, level));
+}
 
 export const REWARD_LABELS: Record<string, string> = Object.fromEntries(MISSIONS.map((m) => [m.rewardId, m.rewardHe]));
