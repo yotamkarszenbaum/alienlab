@@ -65,7 +65,8 @@ function BuildSentence({ def, taskId, onComplete, continueLabel }: { def: BuildD
       return;
     }
     // A word counts as wrong only when it is missing (a wrong word was used instead).
-    const missing = def.wordIds.filter((w) => !built.includes(WORDS_BY_ID[w]?.english ?? ''));
+    const has = (en: string) => built.some((t) => t === en || t === `${en}S` || t === `${en}ES`);
+    const missing = def.wordIds.filter((w) => !has(WORDS_BY_ID[w]?.english ?? ''));
     if (missing.length) update((d) => missing.reduce((acc, w) => record(acc, w, 'wrong', support, attemptNumber, false), d));
     playSfx('tryAgain');
     const s = onWrong(support);

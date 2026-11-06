@@ -2,12 +2,12 @@
 // Task engine: turns content definitions into concrete question instances
 // (options, correct answer, difficulty) and evaluates answers per word.
 // ---------------------------------------------------------------------------
-import type { ItemSpec, MissionStepDef, SentenceDef, TaskType, WordDef } from './types';
+import type { ItemSpec, MissionStepDef, ReadQuestionDef, SentenceDef, TaskType, WordDef } from './types';
 import { catalog, describeItemHe, itemId, sameItem } from '../content/items';
 import { WORDS, WORDS_BY_ID } from '../content/words';
 import { hasFeature, salientFeatures, seededShuffle } from './alienMind';
 
-export type QuestionMode = 'word_to_picture' | 'picture_to_word' | 'sentence_to_picture' | 'mission';
+export type QuestionMode = 'word_to_picture' | 'picture_to_word' | 'sentence_to_picture' | 'mission' | 'read';
 
 export interface ChoiceOption {
   key: string;
@@ -83,7 +83,8 @@ export function buildPictureToWord(
 ): QuestionInstance {
   const picture = word.positiveExamples[opts.variant % word.positiveExamples.length];
   // A word is a fair distractor only if the picture does NOT show it (no two right answers).
-  const candidates = WORDS.filter((w) => w.id !== word.id && introduced.includes(w.id) && !hasFeature(picture, w.target));
+  const shows = (w: WordDef) => hasFeature(picture, w.target) || (w.target.dim === 'kind' && picture.rel?.ref === w.target.value);
+  const candidates = WORDS.filter((w) => w.id !== word.id && introduced.includes(w.id) && !shows(w));
   const sameCat = candidates.filter((w) => w.category === word.category || w.unitId === word.unitId);
   const others = candidates.filter((w) => !sameCat.includes(w));
   const ordered = opts.easy ? [...others, ...sameCat] : [...sameCat, ...others];
@@ -167,6 +168,26 @@ export function buildSceneQuestion(word: WordDef, scene: ItemSpec[], opts: { tas
     promptHe: word.hebrew,
     showText: !opts.audioOnly,
     options: scene.map((i) => pictureOption(i, hasFeature(i, word.target), correctItem)),
+    context: 'new',
+  };
+}
+
+/** Reading: a Hebrew question about the text, answered with a picture. promptEn = the line that answers it. */
+export function buildReadQuestion(rq: ReadQuestionDef, lines: string[], opts: { taskId: string; variant: number }): QuestionInstance {
+  const options = seededShuffle(
+    [pictureOption(rq.answer, true, rq.answer), ...rq.distractors.map((d) => pictureOption(d, false, rq.answer))],
+    opts.variant * 11 + rq.id.length,
+  );
+  return {
+    key: `${opts.taskId}:${opts.variant}`,
+    taskId: opts.taskId,
+    mode: 'read',
+    taskType: 'read',
+    wordIds: rq.wordIds,
+    promptEn: lines[rq.line] ?? '',
+    promptHe: rq.promptHe,
+    showText: true,
+    options,
     context: 'new',
   };
 }

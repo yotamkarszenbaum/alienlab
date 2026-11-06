@@ -208,6 +208,89 @@ function Key({ t }: { t: Tone }) {
   );
 }
 
+function Hat({ t }: { t: Tone }) {
+  return (
+    <g>
+      <ellipse cx="60" cy="92" rx="54" ry="15" fill={t.base} stroke={OUT} strokeWidth="3.5" />
+      <path d="M32 90 L 34 58 C 35 50, 44 46, 60 46 C 76 46, 85 50, 86 58 L 88 90 Z" fill={t.base} stroke={OUT} strokeWidth="3.5" strokeLinejoin="round" />
+      <path d="M33 78 Q 60 86 87 78 L 87.6 88 Q 60 96 32.4 88 Z" fill={t.dark} />
+      <path d="M44 56 C 47 52, 52 51, 58 51" stroke={t.light} strokeWidth="5" fill="none" strokeLinecap="round" />
+      <path d="M78 80 l 10 -6 l 2 10 Z" fill="#ffd23f" stroke={OUT} strokeWidth="2" strokeLinejoin="round" />
+    </g>
+  );
+}
+
+function Table({ t }: { t: Tone }) {
+  return (
+    <g>
+      <rect x="17" y="62" width="10" height="50" rx="3" fill={t.dark} stroke={OUT} strokeWidth="3" />
+      <rect x="93" y="62" width="10" height="50" rx="3" fill={t.dark} stroke={OUT} strokeWidth="3" />
+      <rect x="6" y="52" width="108" height="13" rx="4" fill={t.base} stroke={OUT} strokeWidth="3.5" />
+      <path d="M12 56 H 108" stroke={t.light} strokeWidth="3" strokeLinecap="round" />
+    </g>
+  );
+}
+
+/** Draw `n` copies of a shape with their feet on `ground`, centred around x = cx. */
+function Copies({ item, n, cx, ground, s, gap }: { item: ItemSpec; n: number; cx: number; ground: number; s: number; gap: number }) {
+  const xs = n === 1 ? [cx] : n === 2 ? [cx - gap / 2, cx + gap / 2] : [cx - gap, cx, cx + gap];
+  return (
+    <>
+      {xs.map((x, i) => (
+        <g key={i} transform={`translate(${x} ${ground}) scale(${s}) translate(-60 -114)`}>
+          <ItemShape item={item} />
+        </g>
+      ))}
+    </>
+  );
+}
+
+/** Two/three copies, or an item IN / ON / UNDER a reference object. */
+function Composite({ item }: { item: ItemSpec }) {
+  const main: ItemSpec = { kind: item.kind, color: item.color, size: item.size, state: item.state };
+  const n = item.count ?? 1;
+  const sizeK = item.size === 'small' ? 0.75 : item.size === 'big' ? 1.2 : 1;
+  if (!item.rel) {
+    const s = (n === 3 ? 0.36 : 0.5) * sizeK;
+    return <Copies item={main} n={n} cx={60} ground={110} s={s} gap={n === 3 ? 38 : 54} />;
+  }
+  const ref: ItemSpec = { kind: item.rel.ref, color: 'brown', size: 'normal', state: item.rel.ref === 'box' ? (item.rel.pos === 'in' ? 'open' : 'closed') : 'none' };
+  const t = PALETTE.brown;
+  const k = (n === 1 ? 1 : n === 2 ? 0.8 : 0.66) * sizeK;
+  const gap = n === 1 ? 0 : 34;
+  if (item.rel.ref === 'table') {
+    if (item.rel.pos === 'on')
+      return (
+        <>
+          <ItemShape item={ref} />
+          <Copies item={main} n={n} cx={60} ground={53} s={0.4 * k} gap={gap} />
+        </>
+      );
+    return (
+      <>
+        <ItemShape item={ref} />
+        <Copies item={main} n={n} cx={60} ground={112} s={0.38 * k} gap={gap} />
+      </>
+    );
+  }
+  // box
+  if (item.rel.pos === 'in')
+    return (
+      <>
+        <ItemShape item={ref} />
+        <Copies item={main} n={n} cx={60} ground={74} s={0.52 * k} gap={gap} />
+        <rect x="22" y="60" width="76" height="48" rx="3" fill={t.base} stroke={OUT} strokeWidth="3.5" />
+        <rect x="54" y="60" width="12" height="48" fill={t.light} opacity="0.8" />
+      </>
+    );
+  return (
+    <>
+      <ItemShape item={ref} />
+      <Copies item={main} n={n} cx={60} ground={44} s={0.36 * k} gap={gap} />
+    </>
+  );
+}
+
 function Fallback({ label }: { label: string }) {
   return (
     <g>
@@ -220,6 +303,7 @@ function Fallback({ label }: { label: string }) {
 }
 
 export function ItemShape({ item }: { item: ItemSpec }) {
+  if ((item.count && item.count > 1) || item.rel) return <Composite item={item} />;
   const t = PALETTE[item.color] ?? PALETTE.gray;
   switch (item.kind) {
     case 'apple':
@@ -242,6 +326,10 @@ export function ItemShape({ item }: { item: ItemSpec }) {
       return <Door t={t} open={item.state === 'open'} />;
     case 'key':
       return <Key t={t} />;
+    case 'hat':
+      return <Hat t={t} />;
+    case 'table':
+      return <Table t={t} />;
     default:
       return <Fallback label={describeItemHe(item)} />;
   }
@@ -260,7 +348,9 @@ export function ItemArt({
   decorative?: boolean;
   ignoreSize?: boolean;
 }) {
-  const s = ignoreSize ? 0.92 : SCALE[item.size] ?? SCALE.normal;
+  // Composite pictures (several copies / an item on a table) use the whole frame.
+  const composite = (item.count && item.count > 1) || !!item.rel;
+  const s = composite ? 1 : ignoreSize ? 0.92 : (SCALE[item.size] ?? SCALE.normal);
   const label = describeItemHe(item);
   return (
     <svg

@@ -256,7 +256,7 @@ export function LabScreen({ message }: { message?: string }) {
                   data-testid={`station-${u.id}`}
                   data-status={st}
                   aria-label={`${u.titleHe} — ${st === 'locked' ? 'נעול' : st === 'completed' ? 'הושלם' : 'פתוח'}`}
-                  className={`card text-start p-4 flex flex-col gap-3 transition ${st === 'locked' ? 'opacity-70 grayscale-[.5]' : 'hover:-translate-y-1'} cursor-pointer`}
+                  className={`card text-start p-4 flex flex-col gap-3 transition ${st === 'locked' ? 'opacity-70 grayscale-[.5]' : 'hover:ring-4 hover:ring-primary/30'} cursor-pointer`}
                   style={{ borderColor: st === 'locked' ? undefined : u.accent }}
                   onClick={() => {
                     if (st === 'locked') {
@@ -371,7 +371,7 @@ export function LevelScreen() {
                 type="button"
                 data-testid={`level-${l.level}`}
                 onClick={() => pick(l.level)}
-                className={`card p-5 flex flex-col items-center gap-3 text-center cursor-pointer hover:-translate-y-1 transition ${data.game.level === l.level ? 'ring-4 ring-primary' : ''}`}
+                className={`card p-5 flex flex-col items-center gap-3 text-center cursor-pointer hover:ring-4 hover:ring-primary/30 transition-shadow ${data.game.level === l.level ? 'ring-4 ring-primary' : ''}`}
               >
                 <span className="flex gap-1 text-sun-dark" aria-hidden>
                   {Array.from({ length: l.stars }).map((_, k) => (

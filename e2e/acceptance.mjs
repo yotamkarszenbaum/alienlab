@@ -121,6 +121,15 @@ function helpers(page) {
     }
   }
 
+  async function doFill() {
+    const s0 = await stepId();
+    for (let g = 0; g < 8; g++) {
+      if ((await stepId()) !== s0) return;
+      await click('[data-testid=fill-bank] button[data-correct=true]');
+      await click('[data-testid=next-btn]');
+    }
+  }
+
   async function playUnit(hooks = {}) {
     for (let g = 0; g < 40; g++) {
       const id = await stepId();
@@ -135,12 +144,13 @@ function helpers(page) {
       else if (type === 'teach') await doTeach();
       else if (type === 'spell') await doSpell();
       else if (type === 'build') await doBuild();
-      else if (type === 'says') await answerQuestions();
+      else if (type === 'says' || type === 'read') await answerQuestions();
+      else if (type === 'fill') await doFill();
       else if (type === 'play') await doMission();
       else if (type === 'summary') return;
     }
   }
-  return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, doBuild, doSpell, playUnit };
+  return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, doBuild, doSpell, doFill, playUnit };
 }
 
 async function startNewGame(page, h, level = 1) {
@@ -492,7 +502,29 @@ const newBadges = await page.locator('[data-testid^=new-words-]').count();
 await page.screenshot({ path: SHOTS + 'd23-lab-level2.png', fullPage: true });
 await h.click('[data-testid=station-earth]');
 const firstNew = await h.stepId();
-await h.playUnit();
+let l2Fill = null;
+let l2Spell = [];
+await h.playUnit({
+  'earth-fill': async () => {
+    await page.screenshot({ path: SHOTS + 'd23b-fill.png', fullPage: true });
+    await h.click('[data-testid=fill-bank] button[data-correct=false]');
+    const tip = (await h.exists('[data-testid=hint-panel]')) ? await h.text('[data-testid=hint-panel]') : '';
+    const s0 = await h.save();
+    await h.doFill();
+    const s1 = await h.save();
+    l2Fill = { tip, catWrong: s0.learning.cat.wrong, filled: s1.attempts.filter((a) => a.taskType === 'fill_blank' && a.completed).map((a) => a.wordId) };
+  },
+  'earth-spell': async () => {
+    for (let g = 0; g < 4; g++) {
+      if (!(await h.exists('[data-testid=spell-word]'))) break;
+      l2Spell.push(await page.getAttribute('[data-testid=spell-word]', 'data-word'));
+      await h.doSpell();
+      if ((await h.stepId()) !== 'earth-spell') break;
+    }
+  },
+});
+note('רמה 2: השלמת משפט ממאגר מילים', `אחרי בחירה שגויה הוצג טיפ: "${l2Fill?.tip.replace(/\s+/g, ' ')}"; נרשמה טעות ל-CAT: ${l2Fill?.catWrong}; הושלמו: ${l2Fill?.filled.join(', ')}`, !!l2Fill && l2Fill.tip.length > 0 && l2Fill.catWrong >= 1 && l2Fill.filled.includes('cat') && l2Fill.filled.includes('hat'));
+note('רמה 2: איות מילים קצרות (CVC)', `מילים לאיות: ${l2Spell.join(', ')}`, l2Spell[0] === 'cat');
 const sL2 = await h.save();
 note('העלאת רמה באמצע המשחק (1→2)', `תג רמה: "${chip.trim()}"; תחנות עם "מילים חדשות": ${newBadges}; השלב הבא ביחידה 1: ${firstNew}; CAR נלמדה: ${sL2.learning.car.introduced}; יחידות שהושלמו נשמרו: ${sL2.game.completedUnits.length}`, chip.includes('חוקרי חלל') && newBadges === 3 && firstNew === 'car-discover' && sL2.learning.car.introduced && sL2.game.completedUnits.length === 3);
 await h.click('[data-testid=back-to-lab]');
@@ -589,8 +621,9 @@ await h3.playUnit({
   each: async (id) => seen3.push(id),
   'earth-spell': async () => {
     await p3.screenshot({ path: SHOTS + 'd24-spell.png', fullPage: true });
-    // word 1 (CAT): build it wrong first -> hint, green letters kept
+    // word 1: build it wrong first -> hint, green letters kept
     const target = (await p3.getAttribute('[data-testid=spell-word]', 'data-word')).toUpperCase();
+    const firstRecognitionWrongBefore = (await h3.save()).learning[target.toLowerCase()].wrong;
     const tiles = await p3.locator('[data-testid=spell-tiles] button').evaluateAll((b) => b.map((x) => x.dataset.testid.replace('tile-', '')));
     const wrongFirst = tiles.find((c) => !target.includes(c));
     await h3.click(`[data-testid=tile-${wrongFirst}]`, 250);
@@ -618,7 +651,8 @@ await h3.playUnit({
       await h3.click('[data-testid=next-btn]');
     }
     const s = await h3.save();
-    spellInfo = { target, hintLevel, greenKept, doneLine, cat: s.learning.cat, dog: s.learning.dog };
+    const second = s.attempts.filter((a) => a.taskType === 'spell_word').map((a) => a.wordId).find((w) => w !== target.toLowerCase());
+    spellInfo = { target, hintLevel, greenKept, doneLine, first: s.learning[target.toLowerCase()], second: s.learning[second], secondId: second, firstRecognitionWrongBefore };
   },
 });
 const s3 = await h3.save();
@@ -662,14 +696,62 @@ await h3.playUnit({
 note('בניית משפטים: שגיאת סדר', `טיפ: "${buildInfo?.tip.replace(/\s+/g, ' ')}"; שגיאות שנרשמו למילים בגלל סדר: ${buildInfo?.orderErrorsCounted}; RED נרשמה כ"עם עזרה": ${buildInfo?.redHinted}; משפטים שהושלמו: ${buildInfo?.sentences.join(', ')}`, !!buildInfo && buildInfo.tip.includes('הצבע בא לפני') && buildInfo.orderErrorsCounted === 0 && buildInfo.redHinted === 1 && ['b1', 'b2', 'b3', 'b4'].every((b) => buildInfo.sentences.includes(b)));
 note('דוגמה נגדית (גילי 10–12)', `אחרי תפוח אדום: ${negInfo?.g1}; אחרי "תפוח ירוק זה לא RED": ${negInfo?.g2} (${negInfo?.u2}); נשמר: ${JSON.stringify(negInfo?.negatives)}; קוסמו: "${negInfo?.line}"`, negInfo?.g1 === 'kind:apple' && negInfo?.g2 === 'color:red' && negInfo?.u2 === 'understood' && negInfo?.negatives?.[0] === 'apple.green.normal.none');
 await h3.click('[data-testid=back-to-lab]');
+// ---- Level 3, unit 3: positions, reading, teaching UNDER
+await h3.click('[data-testid=station-lab]');
+let readInfo = null;
+let underInfo = null;
+let fillInfo = null;
+await h3.playUnit({
+  'under-discover': async () => {
+    await p3.screenshot({ path: SHOTS + 'd30-under.png', fullPage: true });
+    await h3.click('[data-testid=next-btn]');
+  },
+  'lab-fill': async () => {
+    const seen = [];
+    for (let g = 0; g < 6; g++) {
+      if ((await h3.stepId()) !== 'lab-fill') break;
+      const id = await p3.getAttribute('[data-testid=fill-sentence]', 'data-sentence');
+      seen.push(id);
+      if (id === 'f3') await p3.screenshot({ path: SHOTS + 'd31-fill-under.png', fullPage: true });
+      await h3.click('[data-testid=fill-bank] button[data-correct=true]');
+      await h3.click('[data-testid=next-btn]');
+    }
+    fillInfo = seen;
+  },
+  'lab-read': async () => {
+    const lines = await p3.locator('[data-testid=read-text] [data-line]').count();
+    await h3.click('[data-testid=options] button[data-correct=false]');
+    const hl = await p3.getAttribute('[data-testid=read-text] [data-highlight=true]', 'data-line');
+    await p3.screenshot({ path: SHOTS + 'd32-read.png', fullPage: true });
+    await h3.answerQuestions();
+    const s = await h3.save();
+    readInfo = { lines, hl, done: s.attempts.filter((a) => a.taskType === 'read' && a.completed).map((a) => a.taskId.split(':')[1]) };
+  },
+  'teach-under': async () => {
+    await h3.click('[data-testid=teach-pool] button[data-testid="opt-ball.red.normal.none.under-table"]');
+    const g1 = await p3.getAttribute('[data-testid=alien-thought]', 'data-guess');
+    await h3.click('[data-testid=start-test-btn]');
+    await p3.waitForSelector('[data-testid=alien-choice]', { timeout: 8000 });
+    const choice = await p3.locator('[data-testid=test-scene] button:has([data-testid=alien-choice])').getAttribute('data-testid');
+    await p3.screenshot({ path: SHOTS + 'd33-test-under.png', fullPage: true });
+    underInfo = { g1, choice };
+    await h3.doTeach();
+    const s = await h3.save();
+    underInfo.ability = s.alien.abilities.includes('find-places');
+  },
+});
+note('רמה 3: השלמת משפט עם IN/ON/UNDER', `משפטים: ${fillInfo?.join(', ')}`, !!fillInfo && fillInfo.includes('f3') && fillInfo.includes('f4'));
+note('רמה 3: קריאת הודעה', `שורות בהודעה: ${readInfo?.lines}; אחרי טעות הודגשה שורה ${readInfo?.hl}; שאלות שנענו: ${readInfo?.done.join(', ')}`, readInfo?.lines === 4 && readInfo.hl === '1' && ['q1', 'q2', 'q3'].every((q) => readInfo.done.includes(q)));
+note('רמה 3: קוסמו לומד UNDER', `אחרי "כדור אדום מתחת לשולחן": ${underInfo?.g1}; בבדיקה בחר ${underInfo?.choice}; יכולת "יודע איפה דברים נמצאים": ${underInfo?.ability}`, underInfo?.g1 === 'kind:ball' && underInfo.choice.includes('ball') && !underInfo.choice.includes('under') && underInfo.ability);
+await h3.click('[data-testid=back-to-lab]');
 note('רמה 3: מילים נוספות ביחידה 1', `שלבים ששוחקו כוללים: ${['car-discover', 'cup-discover', 'earth-spell'].filter((x) => seen3.includes(x)).join(', ')}; מילים שנחשפו ביחידה: ${['apple', 'ball', 'cat', 'dog', 'car', 'cup'].filter((w) => s3.learning[w].introduced).length}/6`, seen3.includes('car-discover') && seen3.includes('cup-discover') && seen3.includes('earth-spell'));
-note('רמה 3: הרכבת מילה מאותיות + רמז', `מילה: ${spellInfo?.target}; אחרי הרכבה שגויה: רמז ברמה ${spellInfo?.hintLevel}, אותיות ירוקות שנשארו: ${spellInfo?.greenKept}; סיום: "${spellInfo?.doneLine}"`, spellInfo?.hintLevel === '1' && spellInfo.greenKept === spellInfo.target.length - 1);
-note('הרכבה נשמרת בנפרד מזיהוי', `CAT: איות שגוי ${spellInfo?.cat.spellWrong}, איות בעזרה ${spellInfo?.cat.spellWithHelp}; DOG: איות לבד ${spellInfo?.dog.spellIndependent}; שגיאות הזיהוי של CAT לא השתנו: ${spellInfo?.cat.wrong === 0}`, spellInfo?.cat.spellWrong === 1 && spellInfo.cat.spellWithHelp === 1 && spellInfo.dog.spellIndependent === 1 && spellInfo.cat.wrong === 0);
+note('רמה 3: הרכבת מילה ארוכה מאותיות + רמז', `מילה: ${spellInfo?.target}; אחרי הרכבה שגויה: רמז ברמה ${spellInfo?.hintLevel}, אותיות ירוקות שנשארו: ${spellInfo?.greenKept}; סיום: "${spellInfo?.doneLine}"`, spellInfo?.hintLevel === '1' && spellInfo.greenKept === spellInfo.target.length - 1);
+note('הרכבה נשמרת בנפרד מזיהוי', `${spellInfo?.target}: איות שגוי ${spellInfo?.first.spellWrong}, איות בעזרה ${spellInfo?.first.spellWithHelp}; ${spellInfo?.secondId}: איות לבד ${spellInfo?.second?.spellIndependent}; שגיאות הזיהוי של ${spellInfo?.target} לא השתנו: ${spellInfo?.first.wrong === spellInfo?.firstRecognitionWrongBefore}`, spellInfo?.first.spellWrong === 1 && spellInfo.first.spellWithHelp === 1 && spellInfo.second?.spellIndependent === 1 && spellInfo.first.wrong === spellInfo.firstRecognitionWrongBefore);
 await gotoParents(p3, h3);
-const spellCol = await h3.text('[data-testid=spell-dog]');
+const spellCol = await h3.text(`[data-testid=spell-${spellInfo?.secondId}]`);
 const exposed3 = await p3.evaluate(() => document.querySelector('[data-testid=stat-exposed]').textContent);
 await p3.screenshot({ path: SHOTS + 'd26-parents-level3.png', fullPage: true });
-note('אזור הורים ברמה 3', `עמודת הרכבה ל-DOG: "${spellCol}"; ${exposed3.replace(/\s+/g, ' ')}`, spellCol.includes('לבד') && exposed3.includes('מתוך 18'));
+note('אזור הורים ברמה 3', `עמודת הרכבה ל-${spellInfo?.secondId}: "${spellCol}"; ${exposed3.replace(/\s+/g, ' ')}`, spellCol.includes('לבד') && exposed3.includes('מתוך 25'));
 note('שגיאות JavaScript ברמה 3', p3errors.length ? p3errors.join(' | ') : 'אין', p3errors.length === 0);
 // ---- "New game" from the home screen (same device, new player)
 await h3.click('[data-testid=home-btn]');

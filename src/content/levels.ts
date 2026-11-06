@@ -10,9 +10,9 @@ export interface LevelDef {
 }
 
 export const LEVELS: LevelDef[] = [
-  { level: 1, titleHe: 'צוערי חלל', agesHe: 'מומלץ לגילי 6–7', descriptionHe: '12 מילים בסיסיות', stars: 1 },
-  { level: 2, titleHe: 'חוקרי חלל', agesHe: 'מומלץ לגילי 8–9', descriptionHe: '15 מילים — עוד מילה בכל תחנה', stars: 2 },
-  { level: 3, titleHe: 'מפקדי חלל', agesHe: 'מומלץ לגילי 10–12', descriptionHe: '18 מילים, וגם מרכיבים מילים מאותיות', stars: 3 },
+  { level: 1, titleHe: 'צוערי חלל', agesHe: 'מומלץ לגילי 6–7', descriptionHe: '12 מילים, הקשבה ותמונות — בלי צורך לקרוא', stars: 1 },
+  { level: 2, titleHe: 'חוקרי חלל', agesHe: 'מומלץ לגילי 8–9 (כיתות ג–ד)', descriptionHe: '18 מילים, איות מילים קצרות, השלמת משפטים ובניית משפטים', stars: 2 },
+  { level: 3, titleHe: 'מפקדי חלל', agesHe: 'מומלץ לגילי 10–12 (כיתות ה–ו)', descriptionHe: '25 מילים: מספרים, IN/ON/UNDER, קריאת הודעות, משפטים ארוכים ודוגמאות נגדיות', stars: 3 },
 ];
 
 export const LEVELS_BY_ID: Record<Level, LevelDef> = { 1: LEVELS[0], 2: LEVELS[1], 3: LEVELS[2] };

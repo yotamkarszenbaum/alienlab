@@ -4,14 +4,17 @@
 // ---------------------------------------------------------------------------
 
 /** Visual feature dimensions that every item in the game is described by. */
-export type Dim = 'kind' | 'color' | 'size' | 'state';
+export type Dim = 'kind' | 'color' | 'size' | 'state' | 'count' | 'pos';
 
 export interface Feature {
   dim: Dim;
   value: string;
 }
 
-export type Kind = 'apple' | 'ball' | 'cat' | 'dog' | 'car' | 'star' | 'cup' | 'box' | 'door' | 'key';
+export type Kind = 'apple' | 'ball' | 'cat' | 'dog' | 'car' | 'star' | 'cup' | 'box' | 'door' | 'key' | 'hat' | 'table';
+
+/** Where an item is relative to another object (IN / ON / UNDER). */
+export type Pos = 'in' | 'on' | 'under';
 export type ColorName =
   | 'red'
   | 'blue'
@@ -35,11 +38,15 @@ export interface ItemSpec {
   color: ColorName;
   size: Size;
   state: ItemState;
+  /** How many copies are shown (TWO / THREE). Missing = one. */
+  count?: 2 | 3;
+  /** The item is IN / ON / UNDER a reference object (a table or a box). */
+  rel?: { pos: Pos; ref: Kind };
 }
 
 // ------------------------------- Content ----------------------------------
 
-export type WordCategory = 'object' | 'animal' | 'color' | 'size' | 'action';
+export type WordCategory = 'object' | 'animal' | 'color' | 'size' | 'action' | 'number' | 'place';
 
 export type TaskType =
   | 'picture_to_word' // 1. identify the word from a picture
@@ -48,8 +55,10 @@ export type TaskType =
   | 'check_alien' // 4. check the alien's decision
   | 'repair_example' // 5. choose a corrective example
   | 'mission' // 6. complete a mission combining learned words
-  | 'spell_word' // 7. build the English word from letter tiles (production, level 3)
-  | 'build_sentence'; // 8. build an English phrase from word chips (levels 2–3)
+  | 'spell_word' // 7. build the English word from letter tiles (production, levels 2–3)
+  | 'build_sentence' // 8. build an English phrase from word chips (levels 2–3)
+  | 'fill_blank' // 9. complete a sentence from a word bank (levels 2–3)
+  | 'read'; // 10. read a short message and answer with pictures (level 3)
 
 export type DiscoverVisual =
   | { type: 'single'; item: ItemSpec }
@@ -136,13 +145,40 @@ export interface BuildDef {
   tipHe: string;
 }
 
+/** Complete the sentence: "I SEE A ___." with a bank of 2–3 chips. */
+export interface FillDef {
+  id: string;
+  minLevel?: Level;
+  before: string;
+  after: string;
+  answer: string;
+  bank: string[];
+  hebrew: string;
+  picture: ItemSpec;
+  /** Words whose knowledge this sentence shows (empty for grammar-only items like IS / ARE). */
+  wordIds: string[];
+  tipHe: string;
+}
+
+export interface ReadQuestionDef {
+  id: string;
+  promptHe: string;
+  /** Index of the line in the text that answers the question. */
+  line: number;
+  answer: ItemSpec;
+  distractors: ItemSpec[];
+  wordIds: string[];
+}
+
 export type StepDef = { minLevel?: Level; maxLevel?: Level } & (
   | { id: string; type: 'discover'; wordId: string }
   | { id: string; type: 'says'; scene: ItemSpec[]; rounds: SaysRoundDef[] }
   | { id: string; type: 'build'; sentences: BuildDef[] }
   | { id: string; type: 'practice'; questions: QuestionDef[]; titleHe?: string }
   | { id: string; type: 'sentence'; sentenceId: string; questions: QuestionDef[] }
-  | { id: string; type: 'spell'; wordIds: string[] }
+  | { id: string; type: 'spell'; wordIds: string[]; /** harder words for level 3 */ wordIdsL3?: string[] }
+  | { id: string; type: 'fill'; sentences: FillDef[] }
+  | { id: string; type: 'read'; titleHe: string; lines: string[]; questions: ReadQuestionDef[] }
   | { id: string; type: 'teach'; conceptId: string }
   | { id: string; type: 'play'; missionId: string }
   | { id: string; type: 'summary' }

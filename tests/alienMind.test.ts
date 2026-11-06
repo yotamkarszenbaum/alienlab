@@ -12,7 +12,7 @@ import {
   teachNegative,
   understandingOf,
 } from '../src/engine/alienMind';
-import { item, itemId } from '../src/content/items';
+import { item, itemId, items, parseItemId, placed, describeItemHe } from '../src/content/items';
 import { getWord } from '../src/content/words';
 
 const RED = getWord('red');
@@ -121,7 +121,7 @@ describe('alien mind — other concept types', () => {
   });
 
   it('every generated scene has exactly one item matching the alien guess', () => {
-    for (const w of [RED, BIG, DOG, OPEN, getWord('green'), getWord('close')]) {
+    for (const w of [RED, BIG, DOG, OPEN, getWord('green'), getWord('close'), getWord('under')]) {
       for (const ex of w.teach!.pool.filter((i) => hasFeature(i, w.target))) {
         const k = teachExample(emptyConcept(w.id), w.target, ex, 1).knowledge;
         const g = sharedFeatures([ex])[0];
@@ -168,5 +168,36 @@ describe('alien mind — counter-examples (level 3)', () => {
     const scene = buildTestScene(BIG.target, k, BIG.teach!.testPool, 0);
     expect(scene.some((i) => i.kind === 'ball' && i.color === 'blue' && i.size === 'small')).toBe(false); // never re-shown
     expect(scene[alienChoose(scene, BIG.target, k)!].size).toBe('big');
+  });
+});
+
+describe('numbers and positions (level 3)', () => {
+  it('ids round-trip and old ids still parse', () => {
+    const a = items(3, 'cat', 'gray', { rel: { pos: 'on', ref: 'table' } });
+    expect(parseItemId(itemId(a))).toEqual(a);
+    expect(itemId(placed('ball', 'red', 'under'))).toBe('ball.red.normal.none.under-table');
+    expect(parseItemId('apple.red.normal.none')).toEqual(item('apple', 'red'));
+    expect(describeItemHe(a)).toBe('שלושה חתולים אפורים על השולחן');
+    expect(describeItemHe(placed('key', 'yellow', 'in'))).toBe('מפתח צהוב בתוך הקופסה');
+  });
+  it('UNDER: one red ball under the table -> "UNDER = ball"; a cat under the table fixes it', () => {
+    const UNDER = getWord('under');
+    let k = teachExample(emptyConcept('under'), UNDER.target, placed('ball', 'red', 'under'), 1).knowledge;
+    expect(understandingOf(UNDER.target, k)).toBe('misconception');
+    const scene = buildTestScene(UNDER.target, k, UNDER.teach!.testPool, 0);
+    const chosen = scene[alienChoose(scene, UNDER.target, k)!];
+    expect(chosen.kind).toBe('ball');
+    expect(chosen.rel?.pos).not.toBe('under');
+    const r = teachExample(k, UNDER.target, placed('cat', 'gray', 'under'), 2);
+    expect(r.effect).toBe('resolved');
+    k = r.knowledge;
+    const scene2 = buildTestScene(UNDER.target, k, UNDER.teach!.testPool, 1);
+    expect(scene2[alienChoose(scene2, UNDER.target, k)!].rel?.pos).toBe('under');
+  });
+  it('TWO is a count feature: two red balls are not "three"', () => {
+    const TWO = getWord('two');
+    expect(hasFeature(items(2, 'ball', 'red'), TWO.target)).toBe(true);
+    expect(hasFeature(items(3, 'ball', 'red'), TWO.target)).toBe(false);
+    expect(hasFeature(item('ball', 'red'), TWO.target)).toBe(false);
   });
 });

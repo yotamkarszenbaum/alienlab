@@ -18,7 +18,7 @@
 import type { AlienKnowledge, ConceptKnowledge, Dim, Feature, ItemSpec, Understanding } from './types';
 import { adjectiveHe, describeItemHe, itemId, KIND_HE, parseItemId, sameItem } from '../content/items';
 
-export const BIAS: Dim[] = ['kind', 'color', 'size', 'state'];
+export const BIAS: Dim[] = ['kind', 'color', 'size', 'state', 'count', 'pos'];
 
 export const UNDERSTANDING_HE: Record<Understanding, string> = {
   unknown: 'עוד לא שמע את המילה',
@@ -35,11 +35,21 @@ export function salientFeatures(i: ItemSpec): Feature[] {
   ];
   if (i.size !== 'normal') f.push({ dim: 'size', value: i.size });
   if (i.state !== 'none') f.push({ dim: 'state', value: i.state });
+  if (i.count && i.count > 1) f.push({ dim: 'count', value: String(i.count) });
+  // Where the item is (IN / ON / UNDER). The reference object itself is context, not a feature.
+  if (i.rel) f.push({ dim: 'pos', value: i.rel.pos });
   return f;
 }
 
 export function hasFeature(i: ItemSpec, f: Feature): boolean {
-  return (i as unknown as Record<string, string>)[f.dim] === f.value;
+  switch (f.dim) {
+    case 'count':
+      return String(i.count ?? 1) === f.value;
+    case 'pos':
+      return i.rel?.pos === f.value;
+    default:
+      return (i as unknown as Record<string, string>)[f.dim] === f.value;
+  }
 }
 
 export function sameFeature(a: Feature | null | undefined, b: Feature | null | undefined): boolean {
@@ -315,18 +325,30 @@ export function guessLabelHe(f: Feature): string {
       return `משהו ${adjectiveHe('size', f.value)}`;
     case 'state':
       return `משהו ${adjectiveHe('state', f.value)}`;
+    case 'count':
+      return f.value === '2' ? 'שני דברים' : 'שלושה דברים';
+    case 'pos':
+      return POS_PHRASE[f.value] ?? f.value;
   }
 }
+
+const POS_PHRASE: Record<string, string> = {
+  under: 'משהו שנמצא מתחת לדבר אחר',
+  on: 'משהו שנמצא על דבר אחר',
+  in: 'משהו שנמצא בתוך דבר אחר',
+};
 
 /** "משהו אדום" / "כלב". */
 export function targetPhraseHe(f: Feature): string {
   if (f.dim === 'kind') return KIND_HE[f.value as keyof typeof KIND_HE]?.noun ?? f.value;
+  if (f.dim === 'pos' || f.dim === 'count') return guessLabelHe(f);
   return `משהו ${adjectiveHe(f.dim, f.value)}`;
 }
 
 /** "שהוא לא תפוח" / "שהוא לא כחול". */
 export function notGuessPhraseHe(f: Feature): string {
   if (f.dim === 'kind') return `שהוא לא ${KIND_HE[f.value as keyof typeof KIND_HE]?.noun ?? f.value}`;
+  if (f.dim === 'pos') return `שהוא לא ${adjectiveHe('pos', f.value)} דבר אחר`;
   return `שהוא לא ${adjectiveHe(f.dim, f.value)}`;
 }
 

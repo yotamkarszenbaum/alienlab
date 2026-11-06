@@ -11,6 +11,8 @@ import { PlayStep, SummaryStep } from './steps/PlayStep';
 import { SpellStep } from './steps/SpellStep';
 import { SaysStep } from './steps/SaysStep';
 import { BuildStep } from './steps/BuildStep';
+import { FillStep } from './steps/FillStep';
+import { ReadStep } from './steps/ReadStep';
 
 export function UnitScreen({ unitId }: { unitId: string }) {
   const { data, update } = useGame();
@@ -51,7 +53,13 @@ export function UnitScreen({ unitId }: { unitId: string }) {
       body = <SentenceStep key={step.id} sentenceId={step.sentenceId} questions={step.questions.filter((q) => inLevel(q.minLevel, level))} onDone={next} />;
       break;
     case 'spell':
-      body = <SpellStep key={step.id} stepId={step.id} wordIds={step.wordIds} onDone={next} />;
+      body = <SpellStep key={step.id} stepId={step.id} wordIds={level >= 3 && step.wordIdsL3 ? step.wordIdsL3 : step.wordIds} onDone={next} />;
+      break;
+    case 'fill':
+      body = <FillStep key={step.id} stepId={step.id} sentences={step.sentences} onDone={next} />;
+      break;
+    case 'read':
+      body = <ReadStep key={step.id} stepId={step.id} titleHe={step.titleHe} lines={step.lines} questions={step.questions} onDone={next} />;
       break;
     case 'says':
       body = <SaysStep key={step.id} stepId={step.id} scene={step.scene} rounds={step.rounds} onDone={next} />;

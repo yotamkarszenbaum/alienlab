@@ -45,7 +45,7 @@ function GuessIcon({ f, examples }: { f: Feature; examples: ItemSpec[] }) {
     const ex = examples.find((e) => e.kind === f.value);
     return ex ? (
       <span style={{ filter: 'grayscale(1) contrast(1.1)' }}>
-        <ItemArt item={{ ...ex, size: 'normal' }} size={64} decorative ignoreSize />
+        <ItemArt item={{ kind: ex.kind, color: ex.color, state: ex.state, size: 'normal' }} size={64} decorative ignoreSize />
       </span>
     ) : null;
   }
@@ -59,6 +59,16 @@ function GuessIcon({ f, examples }: { f: Feature; examples: ItemSpec[] }) {
         <circle cx="16" cy="44" r="8" fill="#d9d1fb" stroke="#2b2350" strokeWidth="3" />
         <circle cx="42" cy="36" r="18" fill="#ffd23f" stroke="#2b2350" strokeWidth="3" />
       </svg>
+    );
+  }
+  if (f.dim === 'count') {
+    return <span className="w-14 h-14 rounded-2xl border-3 border-ink bg-white grid place-items-center text-3xl font-black en" aria-hidden>{f.value}</span>;
+  }
+  if (f.dim === 'pos') {
+    return (
+      <span style={{ filter: 'grayscale(1)' }}>
+        <ItemArt item={{ kind: 'ball', color: 'gray', size: 'normal', state: 'none', rel: { pos: f.value as 'in' | 'on' | 'under', ref: f.value === 'in' ? 'box' : 'table' } }} size={64} decorative />
+      </span>
     );
   }
   return (

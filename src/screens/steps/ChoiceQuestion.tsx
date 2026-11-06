@@ -82,7 +82,7 @@ export function ChoiceQuestion({
   makeEasier?: (q: QuestionInstance) => QuestionInstance | null;
   onComplete: (r: QuestionResult) => void;
   continueLabel?: string;
-  header?: ReactNode;
+  header?: ReactNode | ((supportLevel: number) => ReactNode);
   ignoreSize?: boolean;
   layout?: 'grid' | 'scene';
 }) {
@@ -130,7 +130,12 @@ export function ChoiceQuestion({
 
   const english = q.promptEn;
   const hebrew = q.promptHe;
-  const explain = q.wordIds.length === 1 ? (WORDS_BY_ID[q.wordIds[0]]?.explainHe ?? `${english} זה ${hebrew}`) : `${english} זה ${hebrew}`;
+  const explain =
+    q.mode === 'read'
+      ? `התשובה כתובה במשפט: ${english.replace(/[.!?]+$/, '')}`
+      : q.wordIds.length === 1
+        ? (WORDS_BY_ID[q.wordIds[0]]?.explainHe ?? `${english} זה ${hebrew}`)
+        : `${english} זה ${hebrew}`;
   const tip = featureTipHe(q.wordIds);
   const audioOnly = !q.showText && enStatus !== 'unavailable';
   const readAloud = data.settings.readAloudHe && heStatus !== 'unavailable';
@@ -226,10 +231,14 @@ export function ChoiceQuestion({
   return (
     <div className="flex flex-col gap-4" data-testid="choice-question" data-question={q.key} data-mode={q.mode}>
       <AlienStage mood={mood} text={line} />
-      {header}
+      {typeof header === 'function' ? header(done ? 0 : support.level) : header}
 
       <div className="card px-4 py-4 flex flex-col items-center gap-3 text-center">
-        {q.mode === 'picture_to_word' && q.picture ? (
+        {q.mode === 'read' ? (
+          <p className="text-2xl font-extrabold" data-testid="read-question">
+            {hebrew}
+          </p>
+        ) : q.mode === 'picture_to_word' && q.picture ? (
           <>
             <ItemArt item={q.picture} size="clamp(130px, 30vw, 190px)" />
             <p className="text-xl font-bold">איך קוראים לזה באנגלית?</p>
@@ -249,7 +258,16 @@ export function ChoiceQuestion({
 
       {support.level > 0 && !done && (
         <HintPanel level={support.level} onLess={() => setSupport(onLessHelp(support))}>
-          {support.level >= 1 && (
+          {support.level >= 1 && q.mode === 'read' && (
+            <p className="flex items-center gap-2 flex-wrap">
+              התשובה נמצאת במשפט המודגש:{' '}
+              <bdi className="en text-primary-dark" dir="ltr">
+                {english}
+              </bdi>
+              <SpeakButton text={english} size="sm" label="השמעת המשפט" />
+            </p>
+          )}
+          {support.level >= 1 && q.mode !== 'read' && (
             <p>
               <bdi className="en text-primary-dark" dir="ltr">
                 {english}
