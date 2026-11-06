@@ -130,6 +130,25 @@ function helpers(page) {
     }
   }
 
+  async function doWarmup(mode = () => 'right') {
+    const s0 = await stepId();
+    for (let g = 0; g < 12; g++) {
+      if ((await stepId()) !== s0) return;
+      if (await exists('[data-testid=warmup-summary]')) {
+        await click('[data-testid=next-btn]');
+        return;
+      }
+      if (!(await exists('[data-testid=warmup-step]'))) {
+        await sleep(400);
+        continue;
+      }
+      const w = await page.getAttribute('[data-testid=warmup-step]', 'data-word');
+      if (mode(w) === 'dont-know') await click('[data-testid=dont-know]');
+      else await click('[data-testid=options] button[data-correct=true]');
+      await click('[data-testid=next-btn]');
+    }
+  }
+
   async function playUnit(hooks = {}) {
     for (let g = 0; g < 40; g++) {
       const id = await stepId();
@@ -146,11 +165,12 @@ function helpers(page) {
       else if (type === 'build') await doBuild();
       else if (type === 'says' || type === 'read') await answerQuestions();
       else if (type === 'fill') await doFill();
+      else if (type === 'warmup') await doWarmup();
       else if (type === 'play') await doMission();
       else if (type === 'summary') return;
     }
   }
-  return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, doBuild, doSpell, doFill, playUnit };
+  return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, doBuild, doSpell, doFill, doWarmup, playUnit };
 }
 
 async function startNewGame(page, h, level = 1) {
@@ -744,7 +764,7 @@ note('רמה 3: השלמת משפט עם IN/ON/UNDER', `משפטים: ${fillInfo
 note('רמה 3: קריאת הודעה', `שורות בהודעה: ${readInfo?.lines}; אחרי טעות הודגשה שורה ${readInfo?.hl}; שאלות שנענו: ${readInfo?.done.join(', ')}`, readInfo?.lines === 4 && readInfo.hl === '1' && ['q1', 'q2', 'q3'].every((q) => readInfo.done.includes(q)));
 note('רמה 3: קוסמו לומד UNDER', `אחרי "כדור אדום מתחת לשולחן": ${underInfo?.g1}; בבדיקה בחר ${underInfo?.choice}; יכולת "יודע איפה דברים נמצאים": ${underInfo?.ability}`, underInfo?.g1 === 'kind:ball' && underInfo.choice.includes('ball') && !underInfo.choice.includes('under') && underInfo.ability);
 await h3.click('[data-testid=back-to-lab]');
-note('רמה 3: מילים נוספות ביחידה 1', `שלבים ששוחקו כוללים: ${['car-discover', 'cup-discover', 'earth-spell'].filter((x) => seen3.includes(x)).join(', ')}; מילים שנחשפו ביחידה: ${['apple', 'ball', 'cat', 'dog', 'car', 'cup'].filter((w) => s3.learning[w].introduced).length}/6`, seen3.includes('car-discover') && seen3.includes('cup-discover') && seen3.includes('earth-spell'));
+note('רמה 3: מילים נוספות ביחידה 1', `שלבים ששוחקו כוללים: ${['earth-warmup', 'cup-discover', 'earth-spell'].filter((x) => seen3.includes(x)).join(', ')}; מילים מוכרות דולגו: ${!seen3.includes('apple-discover') && !seen3.includes('car-discover')}; מילים שנחשפו ביחידה: ${['apple', 'ball', 'cat', 'dog', 'car', 'hat', 'cup'].filter((w) => s3.learning[w].introduced).length}/7`, seen3.includes('earth-warmup') && seen3.includes('cup-discover') && seen3.includes('earth-spell') && !seen3.includes('apple-discover'));
 note('רמה 3: הרכבת מילה ארוכה מאותיות + רמז', `מילה: ${spellInfo?.target}; אחרי הרכבה שגויה: רמז ברמה ${spellInfo?.hintLevel}, אותיות ירוקות שנשארו: ${spellInfo?.greenKept}; סיום: "${spellInfo?.doneLine}"`, spellInfo?.hintLevel === '1' && spellInfo.greenKept === spellInfo.target.length - 1);
 note('הרכבה נשמרת בנפרד מזיהוי', `${spellInfo?.target}: איות שגוי ${spellInfo?.first.spellWrong}, איות בעזרה ${spellInfo?.first.spellWithHelp}; ${spellInfo?.secondId}: איות לבד ${spellInfo?.second?.spellIndependent}; שגיאות הזיהוי של ${spellInfo?.target} לא השתנו: ${spellInfo?.first.wrong === spellInfo?.firstRecognitionWrongBefore}`, spellInfo?.first.spellWrong === 1 && spellInfo.first.spellWithHelp === 1 && spellInfo.second?.spellIndependent === 1 && spellInfo.first.wrong === spellInfo.firstRecognitionWrongBefore);
 await gotoParents(p3, h3);
@@ -769,6 +789,20 @@ await h3.click('[data-testid=level-2]');
 const afterPick = await h3.save();
 note('משחק חדש מההתחלה (מסך הפתיחה)', `כפתור "משחק חדש": ${hasNewBtn}; ${version}; "ביטול" שמר ${keptAfterCancel} ניסיונות; אחרי אישור: מסך בחירת רמה ${onLevel}, ניסיונות שמורים ${afterNew?.attempts.length ?? 0}; רמה חדשה שנבחרה: ${afterPick.game.level}`, hasNewBtn && keptAfterCancel > 0 && onLevel && (afterNew?.attempts.length ?? 0) === 0 && afterPick.game.level === 2 && version.includes(`v${PKG_VERSION}`));
 await ctx3.close();
+
+// ---- Warm-up (levels 2–3): known words skip their introduction
+const ctxW = await browser.newContext({ viewport: { width: 1180, height: 900 } });
+const pw = await ctxW.newPage();
+const hw = helpers(pw);
+await startNewGame(pw, hw, 2);
+await hw.click('[data-testid=station-earth]');
+const firstStep = await hw.stepId();
+await pw.screenshot({ path: SHOTS + 'd34-warmup.png', fullPage: true });
+await hw.doWarmup((w) => (w === 'cat' ? 'dont-know' : 'right'));
+const sW = await hw.save();
+const afterWarm = await hw.stepId();
+note('בדיקה קצרה "מה אתם כבר יודעים" (רמות 2–3)', `שלב ראשון ברמה 2: ${firstStep}; אחרי הבדיקה (CAT סומנה "עוד לא למדתי") השלב הבא: ${afterWarm}; שגיאות שנרשמו ל-CAT: ${sW.learning.cat.wrong}; APPLE נרשמה כזיהוי עצמאי: ${sW.learning.apple.independentCorrect === 1}`, firstStep === 'earth-warmup' && afterWarm === 'cat-discover' && sW.learning.cat.wrong === 0 && sW.learning.apple.independentCorrect === 1);
+await ctxW.close();
 
 // ---- Old (v1) save from the first version of the game still loads
 const ctxOld = await browser.newContext({ viewport: { width: 1180, height: 900 } });

@@ -173,6 +173,8 @@ export interface ReadQuestionDef {
 export type StepDef = { minLevel?: Level; maxLevel?: Level } & (
   | { id: string; type: 'discover'; wordId: string }
   | { id: string; type: 'says'; scene: ItemSpec[]; rounds: SaysRoundDef[] }
+  /** Levels 2–3: quick check of words from lower levels; known words skip their introduction. */
+  | { id: string; type: 'warmup' }
   | { id: string; type: 'build'; sentences: BuildDef[] }
   | { id: string; type: 'practice'; questions: QuestionDef[]; titleHe?: string }
   | { id: string; type: 'sentence'; sentenceId: string; questions: QuestionDef[] }

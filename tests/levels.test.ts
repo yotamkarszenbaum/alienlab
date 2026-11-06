@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MISSIONS_BY_ID, SENTENCES_BY_ID, UNITS, UNITS_BY_ID, stepsFor, unitWordIds } from '../src/content/units';
 import { WORDS, WORDS_BY_ID, wordsForLevel } from '../src/content/words';
 import { inLevel } from '../src/content/levels';
-import { advanceStep, emptyGame, hasNewSteps, completeUnit, setLevel, stepIndexOf, visibleSteps } from '../src/engine/gameProgress';
+import { advanceStep, emptyGame, hasNewSteps, completeUnit, markStepsDone, setLevel, stepIndexOf, visibleSteps } from '../src/engine/gameProgress';
 import { initialSupport, onHelp } from '../src/engine/hints';
 import { introduceWord, recordWordAttempt } from '../src/engine/session';
 import { levelOf } from '../src/engine/learning';
@@ -152,6 +152,38 @@ describe('levels — content', () => {
   });
 });
 
+describe('levels — warm-up for older children', () => {
+  it('levels 2–3 start every station with a warm-up; level 1 does not', () => {
+    for (const u of UNITS) {
+      expect(stepsFor(u, 1)[0].type).toBe('discover');
+      expect(stepsFor(u, 2)[0].type).toBe('warmup');
+      expect(stepsFor(u, 3)[0].type).toBe('warmup');
+    }
+  });
+  it('known words skip their introduction; unknown ones are taught', () => {
+    let g = setLevel(emptyGame(), 3);
+    const earth = UNITS_BY_ID.earth;
+    g = advanceStep(g, 'earth', 'earth-warmup', T0);
+    const known = ['apple', 'ball', 'dog', 'car', 'hat']; // CAT marked "not learned yet"
+    g = markStepsDone(g, 'earth', known.flatMap((w) => [`${w}-discover`, `${w}-practice`]));
+    expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('cat-discover');
+    g = advanceStep(g, 'earth', 'cat-discover', T0);
+    g = advanceStep(g, 'earth', 'cat-practice', T0);
+    expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('cup-discover'); // the level-3 word is always taught
+  });
+  it('a warm-up never counts as a "new activity" badge', () => {
+    let g = setLevel(emptyGame(), 1);
+    const earth = UNITS_BY_ID.earth;
+    for (const s of visibleSteps(g, earth)) g = advanceStep(g, 'earth', s.id, T0);
+    g = completeUnit(g, 'earth', T0).game;
+    g = setLevel(g, 2);
+    // new level-2 words are new activities, the warm-up itself is not
+    expect(hasNewSteps(g, earth)).toBe(true);
+    g = markStepsDone(g, 'earth', visibleSteps(g, earth).filter((s) => s.type !== 'warmup').map((s) => s.id));
+    expect(hasNewSteps(g, earth)).toBe(false);
+  });
+});
+
 describe('levels — progress', () => {
   it('raising the level after finishing a unit adds its new words as next steps', () => {
     let g = setLevel(emptyGame(), 1);
@@ -161,6 +193,9 @@ describe('levels — progress', () => {
     expect(hasNewSteps(g, earth)).toBe(false);
     g = setLevel(g, 3);
     expect(hasNewSteps(g, earth)).toBe(true);
+    // the warm-up opens the station (it skips itself on screen when every older word is already known)
+    expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('earth-warmup');
+    g = advanceStep(g, 'earth', 'earth-warmup', T0);
     expect(visibleSteps(g, earth)[stepIndexOf(g, earth)].id).toBe('car-discover');
     expect(g.completedUnits).toContain('earth'); // nothing taken away
     // lowering again hides them

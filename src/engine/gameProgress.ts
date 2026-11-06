@@ -52,7 +52,7 @@ export function stepIndexOf(g: GameProgress, unit: UnitDef): number {
 export function hasNewSteps(g: GameProgress, unit: UnitDef): boolean {
   if (!g.completedUnits.includes(unit.id)) return false;
   const done = g.doneSteps[unit.id] ?? [];
-  return visibleSteps(g, unit).some((s) => s.type !== 'summary' && !done.includes(s.id));
+  return visibleSteps(g, unit).some((s) => s.type !== 'summary' && s.type !== 'warmup' && !done.includes(s.id));
 }
 
 export function unitStatus(g: GameProgress, unit: UnitDef): UnitStatus {
@@ -71,6 +71,13 @@ export function advanceStep(g: GameProgress, unitId: string, stepId: string, now
     activities: g.activities + 1,
     lastPlayedAt: now,
   };
+}
+
+/** Mark several steps finished at once (words the child already knows skip their introduction). */
+export function markStepsDone(g: GameProgress, unitId: string, stepIds: string[]): GameProgress {
+  const done = g.doneSteps[unitId] ?? [];
+  const add = stepIds.filter((id) => !done.includes(id));
+  return add.length ? { ...g, doneSteps: { ...g.doneSteps, [unitId]: [...done, ...add] } } : g;
 }
 
 /** Go back to a step (e.g. the alien must be taught before a mission). */

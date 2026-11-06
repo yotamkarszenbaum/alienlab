@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Page, TopBar } from '../components/ui';
 import { UNITS_BY_ID } from '../content/units';
 import { inLevel } from '../content/levels';
-import { advanceStep, isUnitUnlocked, levelOfGame, reopenStep, stepIndexOf, visibleSteps } from '../engine/gameProgress';
+import { advanceStep, isUnitUnlocked, levelOfGame, markStepsDone, reopenStep, stepIndexOf, visibleSteps } from '../engine/gameProgress';
 import { useGame, now } from '../state/GameContext';
 import { useNav } from '../state/nav';
 import { DiscoverStep, PracticeStep, SentenceStep } from './steps/LearnSteps';
@@ -13,6 +13,7 @@ import { SaysStep } from './steps/SaysStep';
 import { BuildStep } from './steps/BuildStep';
 import { FillStep } from './steps/FillStep';
 import { ReadStep } from './steps/ReadStep';
+import { WarmupStep } from './steps/WarmupStep';
 
 export function UnitScreen({ unitId }: { unitId: string }) {
   const { data, update } = useGame();
@@ -60,6 +61,20 @@ export function UnitScreen({ unitId }: { unitId: string }) {
       break;
     case 'read':
       body = <ReadStep key={step.id} stepId={step.id} titleHe={step.titleHe} lines={step.lines} questions={step.questions} onDone={next} />;
+      break;
+    case 'warmup':
+      body = (
+        <WarmupStep
+          key={step.id}
+          unit={unit}
+          stepId={step.id}
+          level={level}
+          onDone={(skip) => {
+            update((d) => ({ ...d, game: markStepsDone(advanceStep(d.game, unit.id, step.id, now()), unit.id, skip) }));
+            window.scrollTo({ top: 0 });
+          }}
+        />
+      );
       break;
     case 'says':
       body = <SaysStep key={step.id} stepId={step.id} scene={step.scene} rounds={step.rounds} onDone={next} />;

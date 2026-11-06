@@ -26,6 +26,7 @@ export const UNITS: UnitDef[] = [
     wordIds: ['apple', 'ball', 'cat', 'dog', 'car', 'hat', 'cup'],
     unlocksUnitId: 'colors',
     steps: [
+      { id: 'earth-warmup', type: 'warmup', minLevel: 2 },
       ...wordSteps('apple'),
       ...wordSteps('ball'),
       ...wordSteps('cat'),
@@ -83,6 +84,7 @@ export const UNITS: UnitDef[] = [
     wordIds: ['red', 'blue', 'yellow', 'big', 'green', 'small', 'two', 'three'],
     unlocksUnitId: 'lab',
     steps: [
+      { id: 'colors-warmup', type: 'warmup', minLevel: 2 },
       ...wordSteps('red'),
       ...wordSteps('blue'),
       ...wordSteps('yellow'),
@@ -158,6 +160,7 @@ export const UNITS: UnitDef[] = [
     accent: '#ff8a3d',
     wordIds: ['key', 'door', 'open', 'close', 'box', 'star', 'table', 'on', 'under', 'in'],
     steps: [
+      { id: 'lab-warmup', type: 'warmup', minLevel: 2 },
       ...wordSteps('key'),
       ...wordSteps('door'),
       ...wordSteps('open'),
