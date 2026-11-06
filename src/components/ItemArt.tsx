@@ -20,7 +20,8 @@ export const PALETTE: Record<ColorName, Tone> = {
   black: { base: '#3f4654', dark: '#161b26', light: '#78808f' },
 };
 
-const SCALE = { small: 0.56, normal: 0.84, big: 1.04 } as const;
+// Big must read as clearly bigger than small (≈2.5× tall) even in separate cards.
+const SCALE = { small: 0.42, normal: 0.78, big: 1.04 } as const;
 
 function Apple({ t }: { t: Tone }) {
   return (

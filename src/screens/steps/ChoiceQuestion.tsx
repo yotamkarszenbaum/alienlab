@@ -265,7 +265,11 @@ export function ChoiceQuestion({
       {layout === 'scene' ? (
         <LabScene>
           {q.options.map((o, idx) => {
-            const pos = SCENE_POS[idx % SCENE_POS.length];
+            const base = SCENE_POS[idx % SCENE_POS.length];
+            // A BIG item gets a bigger spot (same floor line), so size differences are obvious.
+            const grow = o.item?.size === 'big' ? 1.3 : 1;
+            const w = base.w * grow;
+            const pos = { w, left: base.left - (w - base.w) / 2, top: base.top - (w - base.w) * 1.6 };
             const st = visibleOptions.includes(o) ? stateOf(o) : 'eliminated';
             return (
               <OptionCard
