@@ -224,6 +224,13 @@ export const WORDS: WordDef[] = [
     missionIds: ['m-colors'],
     explainHe: 'GREEN זה ירוק',
     discoverLineHe: 'התפוח, הכדור והמכונית — כולם בצבע של הדשא. זה ירוק! באנגלית: GREEN.',
+    teach: {
+      pool: [item('apple', 'green'), item('ball', 'blue'), item('car', 'green'), item('apple', 'red'), item('ball', 'green'), item('cup', 'yellow')],
+      testPool: catalog({ kinds: ['apple', 'ball', 'car', 'cup', 'star'] }),
+      ability: { id: 'find-green', labelHe: 'מוצא דברים ירוקים', icon: 'palette' },
+      meaningHe: 'הצבע הירוק',
+      dimLabelHe: 'צבע',
+    },
   },
   {
     id: 'small',
@@ -339,6 +346,20 @@ export const WORDS: WordDef[] = [
     missionIds: ['m-door'],
     explainHe: 'CLOSE זה לסגור — כשמשהו נסגר',
     discoverLineHe: 'הקופסה הייתה פתוחה, ועכשיו... היא נסגרה! לסגור באנגלית זה CLOSE.',
+    teach: {
+      pool: [
+        item('door', 'green', 'normal', 'closed'),
+        item('door', 'green', 'normal', 'open'),
+        item('box', 'blue', 'normal', 'closed'),
+        item('box', 'blue', 'normal', 'open'),
+        item('door', 'brown', 'normal', 'closed'),
+        item('box', 'red', 'normal', 'open'),
+      ],
+      testPool: catalog({ kinds: ['door', 'box'] }),
+      ability: { id: 'close-things', labelHe: 'סוגר דלתות וקופסאות', icon: 'door' },
+      meaningHe: 'לסגור — כשמשהו סגור',
+      dimLabelHe: 'כשמשהו סגור',
+    },
   },
 
   // ---- Unit 3 extra words (higher levels) ----

@@ -9,6 +9,8 @@ import { DiscoverStep, PracticeStep, SentenceStep } from './steps/LearnSteps';
 import { TeachStep } from './steps/TeachStep';
 import { PlayStep, SummaryStep } from './steps/PlayStep';
 import { SpellStep } from './steps/SpellStep';
+import { SaysStep } from './steps/SaysStep';
+import { BuildStep } from './steps/BuildStep';
 
 export function UnitScreen({ unitId }: { unitId: string }) {
   const { data, update } = useGame();
@@ -50,6 +52,12 @@ export function UnitScreen({ unitId }: { unitId: string }) {
       break;
     case 'spell':
       body = <SpellStep key={step.id} stepId={step.id} wordIds={step.wordIds} onDone={next} />;
+      break;
+    case 'says':
+      body = <SaysStep key={step.id} stepId={step.id} scene={step.scene} rounds={step.rounds} onDone={next} />;
+      break;
+    case 'build':
+      body = <BuildStep key={step.id} stepId={step.id} sentences={step.sentences} onDone={next} />;
       break;
     case 'teach':
       body = <TeachStep key={step.id} stepId={step.id} conceptId={step.conceptId} onDone={next} />;

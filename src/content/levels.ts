@@ -20,3 +20,9 @@ export const LEVELS_BY_ID: Record<Level, LevelDef> = { 1: LEVELS[0], 2: LEVELS[1
 export function inLevel(minLevel: Level | undefined, level: Level | null | undefined): boolean {
   return (minLevel ?? 1) <= (level ?? 1);
 }
+
+/** Is a step / question visible at this level (minLevel ≤ level ≤ maxLevel)? */
+export function inRange(minLevel: Level | undefined, maxLevel: Level | undefined, level: Level | null | undefined): boolean {
+  const l = level ?? 1;
+  return (minLevel ?? 1) <= l && l <= (maxLevel ?? 3);
+}

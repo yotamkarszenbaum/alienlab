@@ -1,5 +1,5 @@
 import type { Level, MissionDef, SentenceDef, StepDef, UnitDef } from '../engine/types';
-import { inLevel } from './levels';
+import { inLevel, inRange } from './levels';
 import { item } from './items';
 import { WORDS_BY_ID } from './words';
 
@@ -43,6 +43,18 @@ export const UNITS: UnitDef[] = [
           { id: 'earth-mix-4', mode: 'picture_to_word', wordId: 'car', minLevel: 2 },
         ],
       },
+      {
+        id: 'earth-says',
+        type: 'says',
+        maxLevel: 1,
+        scene: [item('apple', 'red'), item('ball', 'blue'), item('cat', 'orange'), item('dog', 'brown'), item('star', 'yellow')],
+        rounds: [
+          { id: 'r1', wordId: 'ball' },
+          { id: 'r2', wordId: 'cat' },
+          { id: 'r3', wordId: 'apple' },
+          { id: 'r4', wordId: 'dog' },
+        ],
+      },
       { id: 'earth-spell', type: 'spell', wordIds: ['cat', 'dog', 'cup'], minLevel: 3 },
       { id: 'teach-dog', type: 'teach', conceptId: 'dog' },
       { id: 'play-supply', type: 'play', missionId: 'm-supply' },
@@ -77,9 +89,33 @@ export const UNITS: UnitDef[] = [
           { id: 'colors-mix-5', mode: 'picture_to_word', wordId: 'small', minLevel: 3 },
         ],
       },
+      {
+        id: 'colors-says',
+        type: 'says',
+        maxLevel: 1,
+        scene: [item('car', 'blue'), item('apple', 'red'), item('star', 'yellow'), item('dog', 'brown', 'big'), item('cup', 'green')],
+        rounds: [
+          { id: 'r1', wordId: 'red' },
+          { id: 'r2', wordId: 'big' },
+          { id: 'r3', wordId: 'yellow' },
+          { id: 'r4', wordId: 'blue' },
+        ],
+      },
+      {
+        id: 'colors-build',
+        type: 'build',
+        minLevel: 2,
+        sentences: [
+          { id: 'b1', tokens: ['RED', 'BALL'], extraTokens: ['BLUE'], hebrew: 'כדור אדום', wordIds: ['red', 'ball'], picture: item('ball', 'red'), tipHe: 'באנגלית הצבע בא לפני הדבר: קודם "אדום", ואחר כך "כדור".' },
+          { id: 'b2', tokens: ['BIG', 'DOG'], extraTokens: ['CAT'], hebrew: 'כלב גדול', wordIds: ['big', 'dog'], picture: item('dog', 'brown', 'big'), tipHe: 'באנגלית הגודל בא לפני הדבר: קודם "גדול", ואחר כך "כלב".' },
+          { id: 'b3', tokens: ['GREEN', 'CAR'], extraTokens: ['YELLOW'], hebrew: 'מכונית ירוקה', wordIds: ['green', 'car'], picture: item('car', 'green'), tipHe: 'באנגלית הצבע בא לפני הדבר: קודם "ירוקה", ואחר כך "מכונית".' },
+          { id: 'b4', minLevel: 3, tokens: ['SMALL', 'YELLOW', 'CUP'], extraTokens: ['BIG'], hebrew: 'כוס צהובה קטנה', wordIds: ['small', 'yellow', 'cup'], picture: item('cup', 'yellow', 'small'), tipHe: 'באנגלית קודם הגודל, אחר כך הצבע, ובסוף הדבר: קטנה ← צהובה ← כוס.' },
+        ],
+      },
       { id: 'colors-spell', type: 'spell', wordIds: ['red', 'big', 'blue'], minLevel: 3 },
       { id: 'teach-red', type: 'teach', conceptId: 'red' },
       { id: 'teach-big', type: 'teach', conceptId: 'big' },
+      { id: 'teach-green', type: 'teach', conceptId: 'green', minLevel: 2 },
       { id: 'play-colors', type: 'play', missionId: 'm-colors' },
       { id: 'colors-summary', type: 'summary' },
     ],
@@ -108,8 +144,31 @@ export const UNITS: UnitDef[] = [
           { id: 'sentence-q2', mode: 'sentence_to_picture', sentenceId: 'open-the-door' },
         ],
       },
+      {
+        id: 'lab-says',
+        type: 'says',
+        maxLevel: 1,
+        scene: [item('key', 'yellow'), item('door', 'brown', 'normal', 'closed'), item('box', 'red', 'normal', 'open'), item('cup', 'blue'), item('star', 'yellow')],
+        rounds: [
+          { id: 'r1', wordId: 'key' },
+          { id: 'r2', wordId: 'open' },
+          { id: 'r3', wordId: 'door' },
+          { id: 'r4', wordId: 'close' },
+        ],
+      },
+      {
+        id: 'lab-build',
+        type: 'build',
+        minLevel: 2,
+        sentences: [
+          { id: 'b1', tokens: ['OPEN', 'THE', 'DOOR'], extraTokens: ['CLOSE'], hebrew: 'פתח את הדלת', wordIds: ['open', 'door'], picture: item('door', 'brown', 'normal', 'open'), tipHe: 'קודם הפעולה (לפתוח), אחר כך THE, ובסוף הדבר (דלת).' },
+          { id: 'b2', tokens: ['CLOSE', 'THE', 'BOX'], extraTokens: ['OPEN'], hebrew: 'סגור את הקופסה', wordIds: ['close', 'box'], picture: item('box', 'blue', 'normal', 'closed'), tipHe: 'קודם הפעולה (לסגור), אחר כך THE, ובסוף הדבר (קופסה).' },
+          { id: 'b3', minLevel: 3, tokens: ['OPEN', 'THE', 'RED', 'BOX'], extraTokens: ['DOOR'], hebrew: 'פתח את הקופסה האדומה', wordIds: ['open', 'red', 'box'], picture: item('box', 'red', 'normal', 'open'), tipHe: 'פעולה ← THE ← צבע ← דבר. באנגלית הצבע בא לפני הקופסה.' },
+        ],
+      },
       { id: 'lab-spell', type: 'spell', wordIds: ['key', 'door', 'star'], minLevel: 3 },
       { id: 'teach-open', type: 'teach', conceptId: 'open' },
+      { id: 'teach-close', type: 'teach', conceptId: 'close', minLevel: 2 },
       { id: 'play-door', type: 'play', missionId: 'm-door' },
       { id: 'lab-summary', type: 'summary' },
     ],
@@ -390,7 +449,7 @@ export const FIRST_UNIT_ID = UNITS[0].id;
 
 /** Steps of a unit that are part of the given level. */
 export function stepsFor(unit: UnitDef, level: Level | null | undefined): StepDef[] {
-  return unit.steps.filter((s) => inLevel(s.minLevel, level));
+  return unit.steps.filter((s) => inRange(s.minLevel, s.maxLevel, level));
 }
 
 export function unitWordIds(unit: UnitDef, level: Level | null | undefined): string[] {

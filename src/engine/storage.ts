@@ -82,6 +82,7 @@ function normConcept(id: string, x: unknown): ConceptKnowledge {
     heard: bool(x.heard),
     examples: strArr(x.examples),
     rejected: strArr(x.rejected),
+    negatives: strArr(x.negatives),
     misconceptions: Array.isArray(x.misconceptions) ? (x.misconceptions.filter(isObj) as unknown as ConceptKnowledge['misconceptions']) : [],
     corrections: Array.isArray(x.corrections) ? (x.corrections.filter(isObj) as unknown as ConceptKnowledge['corrections']) : [],
     tests: Array.isArray(x.tests) ? (x.tests.filter(isObj) as unknown as ConceptKnowledge['tests']) : [],

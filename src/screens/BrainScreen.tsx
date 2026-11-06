@@ -48,6 +48,15 @@ export function BrainScreen() {
                           })}
                         </div>
                       )}
+                      {taught && (k.negatives ?? []).length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span className="text-sm text-ink-soft">זה לא {w.english}:</span>
+                          {(k.negatives ?? []).map((e) => {
+                            const it = parseItemId(e);
+                            return it ? <ItemArt key={e} item={it} size={36} /> : null;
+                          })}
+                        </div>
+                      )}
                       {k.misconceptions.length > 0 && (
                         <p className="text-sm">
                           פעם חשבתי ש-<bdi className="en" dir="ltr">{w.english}</bdi> זה {k.misconceptions.map((m) => guessLabelHe(m.feature)).join(', ואחר כך ')}.

@@ -302,7 +302,7 @@ export function LabScreen({ message }: { message?: string }) {
                     )}
                     {st === 'completed' && fresh && (
                       <span className="rounded-full bg-sun border-2 border-ink px-3 py-0.5" data-testid={`new-words-${u.id}`}>
-                        ✨ מילים חדשות ברמה שלכם!
+                        ✨ יש כאן פעילויות חדשות!
                       </span>
                     )}
                   </span>

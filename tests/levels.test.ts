@@ -7,7 +7,7 @@ import { initialSupport, onHelp } from '../src/engine/hints';
 import { introduceWord, recordWordAttempt } from '../src/engine/session';
 import { levelOf } from '../src/engine/learning';
 import { newSave } from '../src/engine/storage';
-import { buildMissionQuestion, buildPictureToWord, buildWordToPicture } from '../src/engine/tasks';
+import { buildMissionQuestion, buildPictureToWord, buildSceneQuestion, buildWordToPicture } from '../src/engine/tasks';
 import { hasFeature } from '../src/engine/alienMind';
 import type { Level } from '../src/engine/types';
 
@@ -34,6 +34,8 @@ describe('levels — content', () => {
               if (q.sentenceId) used.push(...SENTENCES_BY_ID[q.sentenceId].wordIds);
             }
           if (s.type === 'spell') used.push(...s.wordIds);
+          if (s.type === 'says') used.push(...s.rounds.map((r) => r.wordId));
+          if (s.type === 'build') for (const b of s.sentences.filter((b) => inLevel(b.minLevel, level))) used.push(...b.wordIds);
           if (s.type === 'teach') used.push(s.conceptId);
           if (s.type === 'play') for (const ms of MISSIONS_BY_ID[s.missionId].steps.filter((x) => inLevel(x.minLevel, level))) used.push(...ms.wordIds);
           for (const w of used) {
@@ -43,6 +45,39 @@ describe('levels — content', () => {
         }
       }
     }
+  });
+
+  it('"Kosmo says" only at level 1, sentence building only at levels 2–3, new teach concepts from level 2', () => {
+    const types = (l: Level) => UNITS.flatMap((u) => stepsFor(u, l).map((s) => s.type));
+    expect(types(1).filter((t) => t === 'says')).toHaveLength(3);
+    expect(types(2).includes('says')).toBe(false);
+    expect(types(1).includes('build')).toBe(false);
+    expect(types(2).filter((t) => t === 'build')).toHaveLength(2);
+    expect(types(3).filter((t) => t === 'build')).toHaveLength(2);
+    const teach = (l: Level) => UNITS.flatMap((u) => stepsFor(u, l)).filter((s) => s.type === 'teach').map((s) => (s as { conceptId: string }).conceptId);
+    expect(teach(1)).toEqual(['dog', 'red', 'big', 'open']);
+    expect(teach(2)).toEqual(['dog', 'red', 'big', 'green', 'open', 'close']);
+  });
+
+  it('every "Kosmo says" round has exactly one matching item in the scene', () => {
+    for (const u of UNITS)
+      for (const s of u.steps)
+        if (s.type === 'says')
+          for (const r of s.rounds) {
+            const q = buildSceneQuestion(WORDS_BY_ID[r.wordId], s.scene, { taskId: 't', audioOnly: false });
+            expect(q.options.filter((o) => o.correct), `${s.id}/${r.wordId}`).toHaveLength(1);
+          }
+  });
+
+  it('sentence tokens use the right words and the extra chip is a real alternative', () => {
+    for (const u of UNITS)
+      for (const s of u.steps)
+        if (s.type === 'build')
+          for (const b of s.sentences) {
+            for (const w of b.wordIds) expect(b.tokens).toContain(WORDS_BY_ID[w].english);
+            for (const x of b.extraTokens) expect(b.tokens).not.toContain(x);
+            for (const w of b.wordIds) expect(hasFeature(b.picture, WORDS_BY_ID[w].target), `${b.id}: picture shows ${w}`).toBe(true);
+          }
   });
 
   it('spelling steps only at level 3', () => {

@@ -9,6 +9,7 @@ import {
   sharedFeatures,
   snapshot,
   teachExample,
+  teachNegative,
   understandingOf,
 } from '../src/engine/alienMind';
 import { item, itemId } from '../src/content/items';
@@ -120,7 +121,7 @@ describe('alien mind — other concept types', () => {
   });
 
   it('every generated scene has exactly one item matching the alien guess', () => {
-    for (const w of [RED, BIG, DOG, OPEN]) {
+    for (const w of [RED, BIG, DOG, OPEN, getWord('green'), getWord('close')]) {
       for (const ex of w.teach!.pool.filter((i) => hasFeature(i, w.target))) {
         const k = teachExample(emptyConcept(w.id), w.target, ex, 1).knowledge;
         const g = sharedFeatures([ex])[0];
@@ -131,5 +132,41 @@ describe('alien mind — other concept types', () => {
         }
       }
     }
+  });
+});
+
+describe('alien mind — counter-examples (level 3)', () => {
+  it('red apple + "a green apple is NOT red" -> understood', () => {
+    const k = teachExample(emptyConcept('red'), RED.target, item('apple', 'red'), 1).knowledge;
+    const r = teachNegative(k, RED.target, item('apple', 'green'), 2);
+    expect(r.effect).toBe('resolved');
+    expect(r.after.guess).toEqual({ dim: 'color', value: 'red' });
+    expect(r.knowledge.negatives).toEqual(['apple.green.normal.none']);
+    expect(r.knowledge.examples).toHaveLength(1);
+  });
+  it('a red item cannot be a counter-example for RED', () => {
+    const k = teachExample(emptyConcept('red'), RED.target, item('apple', 'red'), 1).knowledge;
+    const r = teachNegative(k, RED.target, item('ball', 'red'), 2);
+    expect(r.effect).toBe('invalid');
+    expect(r.knowledge.negatives).toHaveLength(0);
+  });
+  it('an unrelated counter-example teaches nothing new', () => {
+    const k = teachExample(emptyConcept('red'), RED.target, item('apple', 'red'), 1).knowledge;
+    const r = teachNegative(k, RED.target, item('ball', 'blue'), 2);
+    expect(r.effect).toBe('no_change');
+    expect(understandingOf(RED.target, r.knowledge)).toBe('misconception');
+  });
+  it('counter-example before any example is stored, alien still has no guess', () => {
+    const r = teachNegative(emptyConcept('red'), RED.target, item('ball', 'blue'), 1);
+    expect(r.effect).toBe('first');
+    expect(r.after.guess).toBeNull();
+  });
+  it('the alien test reflects counter-examples (deterministic)', () => {
+    let k = teachExample(emptyConcept('big'), BIG.target, item('ball', 'blue', 'big'), 1).knowledge;
+    k = teachNegative(k, BIG.target, item('ball', 'blue', 'small'), 2).knowledge; // removes kind AND colour
+    expect(understandingOf(BIG.target, k)).toBe('understood');
+    const scene = buildTestScene(BIG.target, k, BIG.teach!.testPool, 0);
+    expect(scene.some((i) => i.kind === 'ball' && i.color === 'blue' && i.size === 'small')).toBe(false); // never re-shown
+    expect(scene[alienChoose(scene, BIG.target, k)!].size).toBe('big');
   });
 });

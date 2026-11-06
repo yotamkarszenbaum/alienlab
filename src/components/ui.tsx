@@ -1,4 +1,5 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import type React from 'react';
 import { Alien, type AlienMood } from './Alien';
 import { ItemArt } from './ItemArt';
 import { IconBulb, IconCheck, IconHome, IconMusic, IconBell, IconSpeaker, IconMute, IconX } from './Icons';
@@ -230,6 +231,8 @@ export function OptionCard({
   imgSize = 'clamp(96px, 22vw, 150px)',
   ignoreSize = false,
   caption,
+  bare = false,
+  style,
 }: {
   option: ChoiceOption;
   state: OptionState;
@@ -238,6 +241,8 @@ export function OptionCard({
   imgSize?: string | number;
   ignoreSize?: boolean;
   caption?: ReactNode;
+  bare?: boolean;
+  style?: React.CSSProperties;
 }) {
   const cls =
     state === 'correct'
@@ -256,7 +261,8 @@ export function OptionCard({
   return (
     <button
       type="button"
-      className={`option ${cls}`}
+      className={`option ${bare ? 'bare' : ''} ${cls}`}
+      style={style}
       onClick={onClick}
       disabled={disabled || state === 'eliminated'}
       aria-label={option.labelHe + (state === 'correct' ? ' — נכון' : state === 'wrong' ? ' — לא זה' : '')}

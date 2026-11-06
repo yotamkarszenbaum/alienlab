@@ -116,6 +116,11 @@ button { font-family: inherit; color: inherit; }
 .option.is-alien { border-color: var(--color-teal); box-shadow: 0 0 0 6px rgba(31, 183, 156, .35), 0 6px 0 #79d7c4; }
 .option.is-selected { border-color: var(--color-primary); box-shadow: 0 0 0 5px rgba(124, 92, 255, .3), 0 6px 0 #b9a8ff; }
 .option:disabled { cursor: default; }
+.option.bare { background: transparent; border-color: transparent; box-shadow: none; min-height: 0; padding: 2px; border-radius: 20px; }
+.option.bare:hover:not(:disabled) { border-color: #b7a6ff; background: rgba(255,255,255,.45); }
+.option.bare.is-correct { background: rgba(220,252,233,.85); border-color: var(--color-good); }
+.option.bare.is-wrong { background: rgba(255,243,214,.9); border-color: #f0a33c; }
+.option.bare.is-highlight { background: rgba(255,248,220,.8); }
 
 .badge-mark {
   position: absolute; top: -12px; inset-inline-end: -10px; width: 40px; height: 40px; border-radius: 50%;

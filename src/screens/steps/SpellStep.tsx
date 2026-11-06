@@ -90,7 +90,7 @@ function SpellWord({ word, taskId, onComplete, continueLabel }: { word: WordDef;
     setTimeout(() => setShake(false), 500);
     setMood('thinking');
     if (s.level === 1) {
-      setLine('כמעט! האותיות הירוקות כבר במקום. הקשיבו שוב למילה ונסו להשלים.');
+      setLine(keep.some(Boolean) ? 'כמעט! האותיות הירוקות כבר במקום. הקשיבו שוב למילה ונסו להשלים.' : 'כמעט! הקשיבו שוב למילה ונסו שוב.');
       void speak(word.english, 'en');
     } else if (s.level === 2) setLine('הורדתי את האותיות המיותרות. האות הבאה זוהרת בצהוב.');
     else setLine('בואו נעשה את זה יחד: המילה כתובה באפור בתוך המשבצות. לחצו על האותיות לפי הסדר.');

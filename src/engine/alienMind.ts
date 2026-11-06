@@ -12,6 +12,8 @@
 //     So with one red apple, it thinks RED = apple and picks a green apple.
 //  5. A corrective example only helps if it removes the wrong feature from
 //     the shared set (e.g. a red BALL removes "apple").
+//  6. Counter-examples (level 3): an item marked "this is NOT RED" removes
+//     every feature it has from the candidates (a GREEN apple removes "apple").
 // ---------------------------------------------------------------------------
 import type { AlienKnowledge, ConceptKnowledge, Dim, Feature, ItemSpec, Understanding } from './types';
 import { adjectiveHe, describeItemHe, itemId, KIND_HE, parseItemId, sameItem } from '../content/items';
@@ -61,7 +63,7 @@ export function activeGuess(shared: Feature[]): Feature | null {
 }
 
 export function emptyConcept(conceptId: string): ConceptKnowledge {
-  return { conceptId, heard: false, examples: [], rejected: [], misconceptions: [], corrections: [], tests: [] };
+  return { conceptId, heard: false, examples: [], rejected: [], negatives: [], misconceptions: [], corrections: [], tests: [] };
 }
 
 export function emptyAlien(): AlienKnowledge {
@@ -79,8 +81,18 @@ export interface MindSnapshot {
   understanding: Understanding;
 }
 
+export function negativesOf(k: ConceptKnowledge | undefined): ItemSpec[] {
+  if (!k?.negatives) return [];
+  return k.negatives.map(parseItemId).filter((x): x is ItemSpec => !!x);
+}
+
+/** Candidate meanings: shared by all examples, and not present in any counter-example. */
+export function candidateFeatures(examples: ItemSpec[], negatives: ItemSpec[]): Feature[] {
+  return sharedFeatures(examples).filter((f) => !negatives.some((n) => hasFeature(n, f)));
+}
+
 export function snapshot(target: Feature, k: ConceptKnowledge | undefined): MindSnapshot {
-  const shared = sharedFeatures(examplesOf(k));
+  const shared = candidateFeatures(examplesOf(k), negativesOf(k));
   const guess = activeGuess(shared);
   return { shared, guess, understanding: understandingFrom(target, shared, guess, !!k?.heard) };
 }
@@ -147,6 +159,35 @@ export function teachExample(k: ConceptKnowledge, target: Feature, ex: ItemSpec,
   return { knowledge, effect, before, after };
 }
 
+/**
+ * The child shows a counter-example ("this is NOT RED"). Items that DO show
+ * the concept are refused. Effects mirror teachExample.
+ */
+export function teachNegative(k: ConceptKnowledge, target: Feature, ex: ItemSpec, now: number): ExampleResult {
+  const before = snapshot(target, k);
+  const id = itemId(ex);
+  if (hasFeature(ex, target)) return { knowledge: k, effect: 'invalid', before, after: before };
+  const negs = k.negatives ?? [];
+  if (negs.includes(id)) return { knowledge: k, effect: 'duplicate', before, after: before };
+  let knowledge: ConceptKnowledge = { ...k, heard: true, negatives: [...negs, id] };
+  const after = snapshot(target, knowledge);
+  let effect: ExampleEffect;
+  if (!before.guess) effect = 'first';
+  else if (sameSet(before.shared, after.shared)) effect = 'no_change';
+  else if (after.understanding === 'understood') effect = 'resolved';
+  else if (!sameFeature(before.guess, after.guess)) effect = 'new_guess';
+  else effect = 'progress';
+  if (after.understanding === 'misconception' && after.guess) {
+    const last = knowledge.misconceptions[knowledge.misconceptions.length - 1];
+    if (!last || !sameFeature(last.feature, after.guess)) knowledge = { ...knowledge, misconceptions: [...knowledge.misconceptions, { feature: after.guess, at: now }] };
+  }
+  if (before.guess && !sameFeature(before.guess, after.guess)) {
+    knowledge = { ...knowledge, corrections: [...knowledge.corrections, { itemId: `not:${id}`, at: now, before: before.guess, after: after.guess }] };
+  }
+  if (after.understanding === 'understood' && !knowledge.understoodAt) knowledge = { ...knowledge, understoodAt: now };
+  return { knowledge, effect, before, after };
+}
+
 /** Deterministic, seedable shuffle (only used for screen positions, never for the alien's decisions). */
 export function seededShuffle<T>(arr: T[], seed: number): T[] {
   const a = [...arr];
@@ -173,7 +214,7 @@ function pickRotating(pool: ItemSpec[], pred: (i: ItemSpec) => boolean, variant:
 export function buildTestScene(target: Feature, k: ConceptKnowledge, pool: ItemSpec[], variant: number): ItemSpec[] {
   const exs = examplesOf(k);
   const { shared, guess } = snapshot(target, k);
-  const fresh = pool.filter((i) => !k.examples.includes(itemId(i)));
+  const fresh = pool.filter((i) => !k.examples.includes(itemId(i)) && !(k.negatives ?? []).includes(itemId(i)));
   let scene: (ItemSpec | null)[];
 
   if (guess && !sameFeature(guess, target)) {

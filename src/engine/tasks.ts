@@ -154,6 +154,23 @@ export function buildMissionQuestion(step: MissionStepDef, opts: { variant: numb
   };
 }
 
+/** "Kosmo says": the options are the items of a fixed scene (positions never move). */
+export function buildSceneQuestion(word: WordDef, scene: ItemSpec[], opts: { taskId: string; audioOnly: boolean }): QuestionInstance {
+  const correctItem = scene.find((i) => hasFeature(i, word.target)) ?? scene[0];
+  return {
+    key: `${opts.taskId}:scene`,
+    taskId: opts.taskId,
+    mode: 'word_to_picture',
+    taskType: 'word_to_picture',
+    wordIds: [word.id],
+    promptEn: word.english,
+    promptHe: word.hebrew,
+    showText: !opts.audioOnly,
+    options: scene.map((i) => pictureOption(i, hasFeature(i, word.target), correctItem)),
+    context: 'new',
+  };
+}
+
 /** Level-2 support: keep the correct answer and the easiest remaining distractor. */
 export function reduceOptions(options: ChoiceOption[], eliminated: string[]): ChoiceOption[] {
   const correct = options.find((o) => o.correct)!;

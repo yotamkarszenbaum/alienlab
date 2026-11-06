@@ -11,6 +11,39 @@ import { playSfx } from '../../audio/sfx';
 import { speak, useSpeechStatus } from '../../audio/speech';
 import { WORDS_BY_ID } from '../../content/words';
 
+// Positions (percent of the scene) for up to 5 items: two on the shelf, three on the floor.
+const SCENE_POS = [
+  { left: 3, top: 49, w: 24 },
+  { left: 27, top: 14, w: 20 },
+  { left: 38, top: 52, w: 22 },
+  { left: 72, top: 49, w: 24 },
+  { left: 56, top: 17, w: 18 },
+];
+
+/** A simple lab room drawn in SVG: window with stars, a shelf and the floor. */
+function LabScene({ children }: { children: ReactNode }) {
+  return (
+    <div className="card relative w-full overflow-hidden !p-0" style={{ aspectRatio: '16 / 10' }} data-testid="options" data-layout="scene">
+      <svg viewBox="0 0 160 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full" aria-hidden>
+        <rect x="0" y="0" width="160" height="72" fill="#e9e3ff" />
+        <rect x="0" y="72" width="160" height="28" fill="#d8ceff" />
+        <path d="M0 72 H160" stroke="#2b2350" strokeWidth="0.8" />
+        <rect x="8" y="8" width="34" height="24" rx="3" fill="#2f2a5c" stroke="#2b2350" strokeWidth="0.8" />
+        <circle cx="16" cy="15" r="1.2" fill="#fff" />
+        <circle cx="30" cy="12" r="0.9" fill="#fff" />
+        <circle cx="35" cy="24" r="1.3" fill="#ffd23f" />
+        <circle cx="21" cy="25" r="0.8" fill="#fff" />
+        <rect x="40" y="45.5" width="80" height="3" rx="1" fill="#b98a5e" stroke="#2b2350" strokeWidth="0.6" />
+        <rect x="126" y="10" width="26" height="18" rx="2" fill="#fff" stroke="#2b2350" strokeWidth="0.6" />
+        <circle cx="132" cy="19" r="2.5" fill="#7ef0cf" />
+        <circle cx="140" cy="19" r="2.5" fill="#ff9fb8" />
+        <circle cx="148" cy="19" r="2.5" fill="#ffd23f" />
+      </svg>
+      {children}
+    </div>
+  );
+}
+
 export interface QuestionResult {
   firstTryCorrect: boolean;
   anyHint: boolean;
@@ -40,6 +73,7 @@ export function ChoiceQuestion({
   continueLabel = 'המשך',
   header,
   ignoreSize = false,
+  layout = 'grid',
 }: {
   question: QuestionInstance;
   phase: 'learn' | 'review';
@@ -50,6 +84,7 @@ export function ChoiceQuestion({
   continueLabel?: string;
   header?: ReactNode;
   ignoreSize?: boolean;
+  layout?: 'grid' | 'scene';
 }) {
   const { update, data } = useGame();
   const enStatus = useSpeechStatus('en');
@@ -227,6 +262,26 @@ export function ChoiceQuestion({
         </HintPanel>
       )}
 
+      {layout === 'scene' ? (
+        <LabScene>
+          {q.options.map((o, idx) => {
+            const pos = SCENE_POS[idx % SCENE_POS.length];
+            const st = visibleOptions.includes(o) ? stateOf(o) : 'eliminated';
+            return (
+              <OptionCard
+                key={o.key}
+                option={o}
+                state={st}
+                bare
+                onClick={() => choose(o)}
+                disabled={!!done}
+                imgSize="100%"
+                style={{ position: 'absolute', left: `${pos.left}%`, top: `${pos.top}%`, width: `${pos.w}%`, aspectRatio: '1 / 1' }}
+              />
+            );
+          })}
+        </LabScene>
+      ) : (
       <div className={`grid ${cols} gap-3 sm:gap-4`} data-testid="options">
         {visibleOptions.map((o) =>
           o.wordId ? (
@@ -236,6 +291,7 @@ export function ChoiceQuestion({
           ),
         )}
       </div>
+      )}
 
       <div className="flex items-center justify-between gap-3 flex-wrap pt-2">
         {!done ? <HelpButton onClick={help} level={support.level} /> : <span />}

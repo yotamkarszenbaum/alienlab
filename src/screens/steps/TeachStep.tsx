@@ -17,11 +17,14 @@ import {
   snapshot,
   targetPhraseHe,
   teachExample,
+  teachNegative,
+  negativesOf,
   type ExampleEffect,
+  type ExampleResult,
 } from '../../engine/alienMind';
 import { initialSupport, onHelp, onWrong, type SupportState } from '../../engine/hints';
 import { recordWordAttempt, setConcept, syncAbility } from '../../engine/session';
-import { setTeachState, teachStateOf } from '../../engine/gameProgress';
+import { levelOfGame, setTeachState, teachStateOf } from '../../engine/gameProgress';
 import { describeItemHe, itemId, KIND_HE } from '../../content/items';
 import { getWord } from '../../content/words';
 import { useGame, now } from '../../state/GameContext';
@@ -106,6 +109,19 @@ function ExamplesTray({ k, rejected = true }: { k: ConceptKnowledge; rejected?: 
           <ItemArt item={e} size={52} />
         </span>
       ))}
+      {negativesOf(k).length > 0 && (
+        <span className="flex items-center gap-1 ms-2" data-testid="negatives-tray" data-count={negativesOf(k).length}>
+          <span className="text-sm font-bold text-ink-soft">זה לא:</span>
+          {negativesOf(k).map((e) => (
+            <span key={itemId(e)} className="anim-pop relative rounded-2xl bg-white border-2 border-try p-0.5" title={`לא: ${describeItemHe(e)}`}>
+              <ItemArt item={e} size={44} />
+              <span className="absolute -top-2 -end-2 w-6 h-6 rounded-full bg-sun border-2 border-ink grid place-items-center text-xs font-black" aria-hidden>
+                ✗
+              </span>
+            </span>
+          ))}
+        </span>
+      )}
       {rejected && k.rejected.length > 0 && (
         <span className="text-xs text-ink-soft">({k.rejected.length === 1 ? 'דוגמה אחת לא מתאימה לא נלמדה' : `${k.rejected.length} דוגמאות לא מתאימות לא נלמדו`})</span>
       )}
@@ -191,22 +207,100 @@ type PhaseProps = {
   setPhase: (p: Partial<TeachStepState>) => void;
 };
 
+// ------------------------- Counter-examples (level 3) ------------------------
+
+type Mode = 'pos' | 'neg';
+
+function ModeToggle({ mode, setMode, en }: { mode: Mode; setMode: (m: Mode) => void; en: string }) {
+  return (
+    <div className="flex gap-2 flex-wrap" role="radiogroup" aria-label="סוג הדוגמה">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={mode === 'pos'}
+        data-testid="mode-pos"
+        onClick={() => setMode('pos')}
+        className={`min-h-[48px] px-4 rounded-2xl border-3 font-extrabold ${mode === 'pos' ? 'border-teal bg-[#e6fbf5]' : 'border-line bg-white'}`}
+      >
+        ✓ זה <bdi className="en" dir="ltr">{en}</bdi>
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={mode === 'neg'}
+        data-testid="mode-neg"
+        onClick={() => setMode('neg')}
+        className={`min-h-[48px] px-4 rounded-2xl border-3 font-extrabold ${mode === 'neg' ? 'border-try bg-try-bg' : 'border-line bg-white'}`}
+      >
+        ✗ זה לא <bdi className="en" dir="ltr">{en}</bdi>
+      </button>
+    </div>
+  );
+}
+
+function negativeReaction(word: WordDef, r: ExampleResult, i: ItemSpec): { line: string; mood: AlienMood } {
+  const EN = word.english;
+  const d = describeItemHe(i);
+  if (r.effect === 'first') return { line: `אוקיי, ${d} זה לא ${EN}. עכשיו תראו לי גם משהו שהוא כן ${EN}.`, mood: 'thinking' };
+  if (r.effect === 'no_change') return { line: `נכון, ${d} זה לא ${EN}. אבל את זה כבר ידעתי.`, mood: 'thinking' };
+  const s = snapshot(word.target, r.knowledge);
+  const was = r.before.guess ? guessLabelHe(r.before.guess) : '';
+  if (r.effect === 'resolved') return { line: `אה! ${d} זה לא ${EN}... אז ${EN} זה לא ${was} — ${EN} זה ${word.teach!.meaningHe}! 💡`, mood: 'discovery' };
+  if (r.effect === 'new_guess' && s.guess) return { line: `אה! ${d} זה לא ${EN}... אז זה לא ${was}. אולי ${EN} זה ${guessLabelHe(s.guess)}?`, mood: 'curious' };
+  return { line: `נכון, ${d} זה לא ${EN}. זה עזר קצת, אבל אני עדיין חושב ש-${EN} זה ${s.guess ? guessLabelHe(s.guess) : '...'}.`, mood: 'thinking' };
+}
+
+const MAX_NEGATIVES = 2;
+
 // ------------------------------ Teach ---------------------------------------
 
 function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
-  const { update } = useGame();
+  const { data, update } = useGame();
   const EN = word.english;
   const target = word.target;
+  const canNeg = levelOfGame(data.game) >= 3;
+  const [mode, setMode] = useState<Mode>('pos');
   const ask = `הראו לי ${targetPhraseHe(target)} — ${EN}`;
-  const [line, setLine] = useState(`אני חושב שאני מתחיל להבין! עכשיו תורכם ללמד אותי. ${ask}.`);
+  const [line, setLine] = useState(`אני חושב שאני מתחיל להבין! עכשיו תורכם ללמד אותי. ${ask}.${canNeg ? ` אפשר גם להראות לי מה לא ${EN}!` : ''}`);
   const [mood, setMood] = useState<AlienMood>('curious');
   const [support, setSupport] = useState<SupportState>(initialSupport);
   const [lastBad, setLastBad] = useState<string | null>(null);
   const busy = useRef(false);
-  const full = k.examples.length >= MAX_TEACH_EXAMPLES;
+  const negCount = (k.negatives ?? []).length;
+  const full = mode === 'pos' ? k.examples.length >= MAX_TEACH_EXAMPLES : negCount >= MAX_NEGATIVES;
+
+  function pickNeg(i: ItemSpec) {
+    const r = teachNegative(k, target, i, now());
+    if (r.effect === 'duplicate') {
+      setLine('את זה כבר סימנתם כ"לא". אפשר לבחור משהו אחר.');
+      return;
+    }
+    if (r.effect === 'invalid') {
+      playSfx('tryAgain');
+      const s = onWrong(support, 'teach');
+      setSupport(s);
+      record('teach_example', 'wrong', support, support.wrong + 1);
+      setLastBad(itemId(i));
+      setMood('confused');
+      setLine(`רגע, ${describeItemHe(i)} — זה כן ${targetPhraseHe(target)}! אי אפשר להגיד שזה לא ${EN}.`);
+      return;
+    }
+    update((d) => setConcept(d, r.knowledge));
+    playSfx('teach');
+    record('teach_example', 'correct', support, support.wrong + 1);
+    setLastBad(null);
+    const reaction = negativeReaction(word, r, i);
+    setLine(reaction.line);
+    setMood(reaction.mood);
+  }
 
   function pick(i: ItemSpec) {
     if (busy.current || full) return;
+    if (mode === 'neg') {
+      busy.current = true;
+      setTimeout(() => (busy.current = false), 500);
+      return pickNeg(i);
+    }
     busy.current = true;
     setTimeout(() => (busy.current = false), 500);
     const r = teachExample(k, target, i, now());
@@ -247,7 +341,7 @@ function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
     const id = itemId(i);
     if (k.examples.includes(id)) return 'selected';
     if (id === lastBad) return 'wrong';
-    if (support.level >= 2 && hasFeature(i, target)) return 'highlight';
+    if (support.level >= 2 && (mode === 'pos' ? hasFeature(i, target) : !hasFeature(i, target))) return 'highlight';
     return 'idle';
   }
 
@@ -258,9 +352,16 @@ function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
         <div className="flex items-center gap-3 flex-wrap">
           <SpeakButton text={EN} sayHe={word.sayItHe} size="sm" />
           <p className="text-xl font-bold">
-            {full ? 'קוסמו ראה מספיק דוגמאות. בואו נבדוק אותו!' : <>לחצו על דברים שהם <bdi className="en text-primary-dark" dir="ltr">{EN}</bdi> ({word.hebrew}) כדי ללמד את קוסמו</>}
+            {k.examples.length >= MAX_TEACH_EXAMPLES && mode === 'pos' ? (
+              'קוסמו ראה מספיק דוגמאות. בואו נבדוק אותו!'
+            ) : mode === 'neg' ? (
+              <>לחצו על משהו שהוא לא <bdi className="en text-primary-dark" dir="ltr">{EN}</bdi> ({word.hebrew})</>
+            ) : (
+              <>לחצו על דברים שהם <bdi className="en text-primary-dark" dir="ltr">{EN}</bdi> ({word.hebrew}) כדי ללמד את קוסמו</>
+            )}
           </p>
         </div>
+        {canNeg && <ModeToggle mode={mode} setMode={setMode} en={EN} />}
         <AlienThought word={word} k={k} />
         <ExamplesTray k={k} />
       </div>
@@ -275,15 +376,22 @@ function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
         {word.teach!.pool.map((i) => {
           const o = asOption(i);
           const st = stateOf(i);
+          const isNeg = (k.negatives ?? []).includes(o.key);
           return (
             <OptionCard
               key={o.key}
               option={{ ...o, correct: hasFeature(i, target) }}
               state={st}
               onClick={() => pick(i)}
-              disabled={full || st === 'selected'}
+              disabled={full || st === 'selected' || isNeg}
               imgSize="clamp(80px, 22vw, 140px)"
-              caption={st === 'selected' ? <span className="text-xs font-bold text-primary-dark mt-1">קוסמו ראה ✓</span> : undefined}
+              caption={
+                st === 'selected' ? (
+                  <span className="text-xs font-bold text-primary-dark mt-1">קוסמו ראה ✓</span>
+                ) : isNeg ? (
+                  <span className="text-xs font-bold text-try mt-1">✗ זה לא {EN}</span>
+                ) : undefined
+              }
             />
           );
         })}
@@ -482,7 +590,9 @@ function TestPhase({ word, k, ts, record, setPhase }: PhaseProps) {
 // ------------------------------ Repair --------------------------------------
 
 function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
-  const { update } = useGame();
+  const { data, update } = useGame();
+  const canNeg = levelOfGame(data.game) >= 3;
+  const [mode, setMode] = useState<Mode>('pos');
   const EN = word.english;
   const target = word.target;
   const snap = snapshot(target, k);
@@ -499,13 +609,35 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
   const [lastBad, setLastBad] = useState<string | null>(null);
   const [fixed, setFixed] = useState<null | 'resolved' | 'new_guess'>(null);
   const busy = useRef(false);
-  const hintLine = guess ? `קוסמו צריך לראות ${targetPhraseHe(target)} ${notGuessPhraseHe(guess)}.` : `קוסמו צריך לראות ${targetPhraseHe(target)}.`;
+  const hintLine =
+    (guess ? `קוסמו צריך לראות ${targetPhraseHe(target)} ${notGuessPhraseHe(guess)}.` : `קוסמו צריך לראות ${targetPhraseHe(target)}.`) +
+    (canNeg && guess ? ` או: לבחור "זה לא ${EN}" ולהראות לו ${targetPhraseHe(guess)} ${notGuessPhraseHe(target)}.` : '');
 
   function apply(i: ItemSpec, byDemo = false) {
     if (busy.current || fixed) return;
     busy.current = true;
     setTimeout(() => (busy.current = false), 500);
-    const r = teachExample(k, target, i, now());
+    const negative = mode === 'neg' && !byDemo;
+    const r = negative ? teachNegative(k, target, i, now()) : teachExample(k, target, i, now());
+    if (negative && r.effect === 'invalid') {
+      playSfx('tryAgain');
+      record('repair_example', 'wrong', support, support.wrong + 1);
+      setSupport(onWrong(support, 'teach'));
+      setLastBad(itemId(i));
+      setMood('confused');
+      setLine(`רגע, ${describeItemHe(i)} — זה כן ${targetPhraseHe(target)}! ${hintLine}`);
+      return;
+    }
+    if (negative && (r.effect === 'resolved' || r.effect === 'new_guess')) {
+      update((d) => setConcept(d, r.knowledge));
+      playSfx('teach');
+      record('repair_example', 'correct', support, support.wrong + 1);
+      setFixed(r.effect);
+      const reaction = negativeReaction(word, r, i);
+      setMood(reaction.mood);
+      setLine(`${reaction.line} בואו נבדוק אותי שוב!`);
+      return;
+    }
     const attemptNumber = support.wrong + 1;
     if (r.effect !== 'duplicate') update((d) => setConcept(d, r.knowledge));
     if (r.effect === 'invalid') {
@@ -555,6 +687,7 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
         <p className="text-xl font-bold" data-testid="repair-question" data-question={question}>
           בחרו דוגמה אחת שתעזור לקוסמו להבין:
         </p>
+        {canNeg && !fixed && <ModeToggle mode={mode} setMode={setMode} en={EN} />}
         <AlienThought word={word} k={k} compact />
         <ExamplesTray k={k} />
       </div>
@@ -568,7 +701,7 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
           const opt = asOption(o.item);
           const id = itemId(o.item);
           let st: OptionState = 'idle';
-          if (fixed && k.examples.includes(id)) st = 'correct';
+          if (fixed && (k.examples.includes(id) || (k.negatives ?? []).includes(id))) st = 'correct';
           else if (id === lastBad) st = 'wrong';
           else if (!fixed && support.level >= 2 && helpful && id === itemId(helpful.item)) st = 'highlight';
           return (
@@ -628,7 +761,7 @@ function DonePhase({ word, k, onDone }: PhaseProps & { onDone: () => void }) {
         )}
         <ExamplesTray k={k} rejected={false} />
         <p className="text-lg">
-          קוסמו למד מ-{k.examples.length} דוגמאות
+          קוסמו למד מ-{k.examples.length} דוגמאות{(k.negatives ?? []).length > 0 ? ` ומ-${(k.negatives ?? []).length} דוגמאות של "זה לא"` : ''}
           {k.corrections.length > 0 ? ` ושיניתם לו את הדעה ${k.corrections.length === 1 ? 'פעם אחת' : `${k.corrections.length} פעמים`}` : ''}. אתם מורים מעולים!
         </p>
       </div>

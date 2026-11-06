@@ -2,7 +2,8 @@
 // Usage: npm run build && npx vite preview --port 4173 & node e2e/acceptance.mjs
 // Env: CHROME=/path/to/chrome  URL=http://localhost:4173/
 import { chromium } from 'playwright-core';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+const PKG_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
 const BASE_URL = process.env.URL ?? 'http://localhost:4173/';
 const CHROME = process.env.CHROME ?? '/usr/bin/google-chrome';
@@ -104,6 +105,22 @@ function helpers(page) {
     }
   }
 
+  async function doBuild() {
+    const s0 = await stepId();
+    for (let g = 0; g < 6; g++) {
+      if ((await stepId()) !== s0) return;
+      for (let k = 0; k < 8; k++) {
+        if ((await page.getAttribute('[data-testid=next-btn]', 'aria-disabled')) !== 'true') break;
+        const nxt = page.locator('[data-testid=build-chips] button[data-next=true]').first();
+        if (!(await nxt.count())) break;
+        await nxt.click();
+        await sleep(300);
+      }
+      await sleep(600);
+      await click('[data-testid=next-btn]');
+    }
+  }
+
   async function playUnit(hooks = {}) {
     for (let g = 0; g < 40; g++) {
       const id = await stepId();
@@ -117,11 +134,13 @@ function helpers(page) {
       else if (type === 'practice' || type === 'sentence') await answerQuestions();
       else if (type === 'teach') await doTeach();
       else if (type === 'spell') await doSpell();
+      else if (type === 'build') await doBuild();
+      else if (type === 'says') await answerQuestions();
       else if (type === 'play') await doMission();
       else if (type === 'summary') return;
     }
   }
-  return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, playUnit };
+  return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, doBuild, doSpell, playUnit };
 }
 
 async function startNewGame(page, h, level = 1) {
@@ -276,6 +295,18 @@ const attemptsAfterTap = (await h.save()).attempts.length;
 note('לחיצות מהירות מרובות', `3 לחיצות מהירות נרשמו כ-${attemptsAfterTap - attemptsBeforeTap} ניסיון`, attemptsAfterTap - attemptsBeforeTap === 1);
 await h.click('[data-testid=next-btn]');
 await h.answerQuestions();
+
+// ---- "Kosmo says" (level 1): find the word inside the lab scene
+await page.waitForSelector('[data-testid=says-step]');
+const sceneItems = await page.locator('[data-testid=options][data-layout=scene] button.option').count();
+await h.click('[data-testid=options] button[data-correct=false]');
+const saysHint = await h.exists('[data-testid=hint-panel]');
+await page.screenshot({ path: SHOTS + 'd07b-says.png', fullPage: true });
+await h.click('[data-testid=options] button[data-correct=true]');
+const saysAttempt = (await h.save()).attempts.filter((a) => a.taskId.startsWith('earth-says')).map((a) => `${a.wordId}:${a.outcome}`);
+await h.click('[data-testid=next-btn]');
+await h.answerQuestions();
+note('"קוסמו אומר" (גילי 6–7)', `פריטים בסצנה: ${sceneItems}; אחרי טעות הוצג רמז: ${saysHint}; נרשם: ${saysAttempt.join(', ')}`, sceneItems === 5 && saysHint && saysAttempt.includes('ball:wrong') && saysAttempt.includes('ball:correct'));
 
 // ---- Teach DOG: partial understanding for nouns
 await page.waitForSelector('[data-testid=teach-step]');
@@ -591,6 +622,46 @@ await h3.playUnit({
   },
 });
 const s3 = await h3.save();
+await h3.click('[data-testid=back-to-lab]');
+await h3.click('[data-testid=station-colors]');
+let buildInfo = null;
+let negInfo = null;
+await h3.playUnit({
+  'colors-build': async () => {
+    // sentence 1 (RED BALL): wrong ORDER first -> grammar tip, no word counted wrong
+    const before = await h3.save();
+    await h3.click('[data-testid=build-chips] [data-testid=chip-BALL]', 300);
+    await h3.click('[data-testid=build-chips] [data-testid=chip-RED]', 300);
+    await sleep(600);
+    const tip = await h3.exists('[data-testid=hint-panel]') ? await h3.text('[data-testid=hint-panel]') : '';
+    const afterOrder = await h3.save();
+    await p3.screenshot({ path: SHOTS + 'd28-build-hint.png', fullPage: true });
+    await h3.doBuild(); // finishes this sentence and the rest of the step
+    const done = await h3.save();
+    buildInfo = {
+      tip,
+      orderErrorsCounted: afterOrder.learning.red.wrong - before.learning.red.wrong + afterOrder.learning.ball.wrong - before.learning.ball.wrong,
+      redHinted: done.learning.red.hintedCorrect - before.learning.red.hintedCorrect,
+      sentences: done.attempts.filter((a) => a.taskType === 'build_sentence' && a.completed).map((a) => a.taskId.split(':')[1]),
+    };
+  },
+  'teach-red': async () => {
+    await h3.click('[data-testid=teach-pool] button[data-testid="opt-apple.red.normal.none"]');
+    const g1 = await p3.getAttribute('[data-testid=alien-thought]', 'data-guess');
+    await h3.click('[data-testid=mode-neg]');
+    await h3.click('[data-testid=teach-pool] button[data-testid="opt-apple.green.normal.none"]');
+    const g2 = await p3.getAttribute('[data-testid=alien-thought]', 'data-guess');
+    const u2 = await p3.getAttribute('[data-testid=alien-thought]', 'data-understanding');
+    const line = await h3.text('[data-testid=alien-line]');
+    await p3.screenshot({ path: SHOTS + 'd29-negative.png', fullPage: true });
+    const s = await h3.save();
+    negInfo = { g1, g2, u2, line, negatives: s.alien.concepts.red.negatives };
+    await h3.doTeach();
+  },
+});
+note('בניית משפטים: שגיאת סדר', `טיפ: "${buildInfo?.tip.replace(/\s+/g, ' ')}"; שגיאות שנרשמו למילים בגלל סדר: ${buildInfo?.orderErrorsCounted}; RED נרשמה כ"עם עזרה": ${buildInfo?.redHinted}; משפטים שהושלמו: ${buildInfo?.sentences.join(', ')}`, !!buildInfo && buildInfo.tip.includes('הצבע בא לפני') && buildInfo.orderErrorsCounted === 0 && buildInfo.redHinted === 1 && ['b1', 'b2', 'b3', 'b4'].every((b) => buildInfo.sentences.includes(b)));
+note('דוגמה נגדית (גילי 10–12)', `אחרי תפוח אדום: ${negInfo?.g1}; אחרי "תפוח ירוק זה לא RED": ${negInfo?.g2} (${negInfo?.u2}); נשמר: ${JSON.stringify(negInfo?.negatives)}; קוסמו: "${negInfo?.line}"`, negInfo?.g1 === 'kind:apple' && negInfo?.g2 === 'color:red' && negInfo?.u2 === 'understood' && negInfo?.negatives?.[0] === 'apple.green.normal.none');
+await h3.click('[data-testid=back-to-lab]');
 note('רמה 3: מילים נוספות ביחידה 1', `שלבים ששוחקו כוללים: ${['car-discover', 'cup-discover', 'earth-spell'].filter((x) => seen3.includes(x)).join(', ')}; מילים שנחשפו ביחידה: ${['apple', 'ball', 'cat', 'dog', 'car', 'cup'].filter((w) => s3.learning[w].introduced).length}/6`, seen3.includes('car-discover') && seen3.includes('cup-discover') && seen3.includes('earth-spell'));
 note('רמה 3: הרכבת מילה מאותיות + רמז', `מילה: ${spellInfo?.target}; אחרי הרכבה שגויה: רמז ברמה ${spellInfo?.hintLevel}, אותיות ירוקות שנשארו: ${spellInfo?.greenKept}; סיום: "${spellInfo?.doneLine}"`, spellInfo?.hintLevel === '1' && spellInfo.greenKept === spellInfo.target.length - 1);
 note('הרכבה נשמרת בנפרד מזיהוי', `CAT: איות שגוי ${spellInfo?.cat.spellWrong}, איות בעזרה ${spellInfo?.cat.spellWithHelp}; DOG: איות לבד ${spellInfo?.dog.spellIndependent}; שגיאות הזיהוי של CAT לא השתנו: ${spellInfo?.cat.wrong === 0}`, spellInfo?.cat.spellWrong === 1 && spellInfo.cat.spellWithHelp === 1 && spellInfo.dog.spellIndependent === 1 && spellInfo.cat.wrong === 0);
@@ -614,7 +685,7 @@ const onLevel = await h3.exists('[data-testid=level-screen]');
 const afterNew = await h3.save();
 await h3.click('[data-testid=level-2]');
 const afterPick = await h3.save();
-note('משחק חדש מההתחלה (מסך הפתיחה)', `כפתור "משחק חדש": ${hasNewBtn}; ${version}; "ביטול" שמר ${keptAfterCancel} ניסיונות; אחרי אישור: מסך בחירת רמה ${onLevel}, ניסיונות שמורים ${afterNew?.attempts.length ?? 0}; רמה חדשה שנבחרה: ${afterPick.game.level}`, hasNewBtn && keptAfterCancel > 0 && onLevel && (afterNew?.attempts.length ?? 0) === 0 && afterPick.game.level === 2 && /v1\.2\.0/.test(version));
+note('משחק חדש מההתחלה (מסך הפתיחה)', `כפתור "משחק חדש": ${hasNewBtn}; ${version}; "ביטול" שמר ${keptAfterCancel} ניסיונות; אחרי אישור: מסך בחירת רמה ${onLevel}, ניסיונות שמורים ${afterNew?.attempts.length ?? 0}; רמה חדשה שנבחרה: ${afterPick.game.level}`, hasNewBtn && keptAfterCancel > 0 && onLevel && (afterNew?.attempts.length ?? 0) === 0 && afterPick.game.level === 2 && version.includes(`v${PKG_VERSION}`));
 await ctx3.close();
 
 // ---- Old (v1) save from the first version of the game still loads
@@ -675,7 +746,7 @@ await checkLayout('lab');
 await pm.screenshot({ path: SHOTS + 'm02-lab.png', fullPage: true });
 await hm.click('[data-testid=station-earth]');
 let shotN = 3;
-const wanted = new Set(['apple-discover', 'apple-practice', 'earth-mix', 'teach-dog', 'play-supply', 'earth-summary', 'teach-red', 'play-colors']);
+const wanted = new Set(['apple-discover', 'apple-practice', 'earth-mix', 'earth-says', 'teach-dog', 'play-supply', 'earth-summary', 'colors-says', 'teach-red', 'play-colors']);
 await hm.playUnit({
   each: async (id) => {
     await checkLayout(id);
@@ -705,6 +776,24 @@ await hm.playUnit({
 });
 await gotoParents(pm, hm);
 await checkLayout('parents');
+// level 2 on a phone: sentence building
+await hm.click('[data-testid=parent-level-2]');
+await hm.click('[data-testid=home-btn]');
+await hm.click('[data-testid=continue-btn]');
+await hm.click('[data-testid=station-colors]');
+await hm
+  .playUnit({
+    'colors-build': async () => {
+      await checkLayout('colors-build');
+      await pm.screenshot({ path: SHOTS + `m${String(shotN++).padStart(2, '0')}-build.png`, fullPage: true });
+      await hm.doBuild();
+    },
+    'teach-green': async () => {
+      await checkLayout('teach-green');
+      throw new Error('stop');
+    },
+  })
+  .catch(() => {});
 // spelling step on a phone
 await startNewGame(pm, hm, 3);
 await checkLayout('lab-level3');

@@ -48,7 +48,8 @@ export type TaskType =
   | 'check_alien' // 4. check the alien's decision
   | 'repair_example' // 5. choose a corrective example
   | 'mission' // 6. complete a mission combining learned words
-  | 'spell_word'; // 7. build the English word from letter tiles (production, level 3)
+  | 'spell_word' // 7. build the English word from letter tiles (production, level 3)
+  | 'build_sentence'; // 8. build an English phrase from word chips (levels 2–3)
 
 export type DiscoverVisual =
   | { type: 'single'; item: ItemSpec }
@@ -116,8 +117,29 @@ export interface QuestionDef {
   sentenceId?: string;
 }
 
-export type StepDef = { minLevel?: Level } & (
+/** "Kosmo says": one round = a word to find inside the shared scene. */
+export interface SaysRoundDef {
+  id: string;
+  wordId: string;
+}
+
+/** Sentence building: tap word chips in English order. */
+export interface BuildDef {
+  id: string;
+  minLevel?: Level;
+  tokens: string[];
+  extraTokens: string[];
+  hebrew: string;
+  wordIds: string[];
+  picture: ItemSpec;
+  /** Short grammar tip shown as the first hint, e.g. "באנגלית הצבע בא לפני הדבר". */
+  tipHe: string;
+}
+
+export type StepDef = { minLevel?: Level; maxLevel?: Level } & (
   | { id: string; type: 'discover'; wordId: string }
+  | { id: string; type: 'says'; scene: ItemSpec[]; rounds: SaysRoundDef[] }
+  | { id: string; type: 'build'; sentences: BuildDef[] }
   | { id: string; type: 'practice'; questions: QuestionDef[]; titleHe?: string }
   | { id: string; type: 'sentence'; sentenceId: string; questions: QuestionDef[] }
   | { id: string; type: 'spell'; wordIds: string[] }
@@ -242,6 +264,8 @@ export interface ConceptKnowledge {
   examples: string[];
   /** Item ids the child offered that do not show the concept (not learned). */
   rejected: string[];
+  /** Item ids the child marked as "this is NOT the word" (counter-examples, level 3). */
+  negatives: string[];
   /** Wrong hypotheses the alien held, in order. */
   misconceptions: { feature: Feature; at: number }[];
   /** Examples that changed the alien's mind. */

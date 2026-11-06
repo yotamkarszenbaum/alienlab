@@ -196,6 +196,7 @@ export function ParentsScreen() {
                   <th className="text-start p-2">מושג</th>
                   <th className="text-start p-2">הבנה</th>
                   <th className="p-2">דוגמאות</th>
+                  <th className="p-2">דוגמאות "לא"</th>
                   <th className="p-2">אי-הבנות</th>
                   <th className="p-2">תיקונים</th>
                   <th className="p-2">בדיקות</th>
@@ -211,6 +212,7 @@ export function ParentsScreen() {
                       </td>
                       <td className="p-2" data-understanding={understandingOf(w.target, k)}>{UNDERSTANDING_HE[understandingOf(w.target, k)]}</td>
                       <td className="p-2 text-center">{k.examples.length}</td>
+                      <td className="p-2 text-center">{(k.negatives ?? []).length}</td>
                       <td className="p-2 text-center">{k.misconceptions.length}</td>
                       <td className="p-2 text-center">{k.corrections.length}</td>
                       <td className="p-2 text-center">{k.tests.length}</td>
