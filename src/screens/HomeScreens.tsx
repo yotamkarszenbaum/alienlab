@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Alien, type AlienMood } from '../components/Alien';
 import { ItemArt } from '../components/ItemArt';
-import { AlienStage, BigButton, Page, SoundToggles, TopBar } from '../components/ui';
-import { IconArrowLeft, IconBrain, IconCheck, IconLock, IconParent, IconStar } from '../components/Icons';
+import { AlienStage, BigButton, Dialog, Page, SoundToggles, TopBar } from '../components/ui';
+import { IconArrowLeft, IconBrain, IconCheck, IconLock, IconParent, IconRefresh, IconStar } from '../components/Icons';
 import { useGame, now } from '../state/GameContext';
 import { useNav } from '../state/nav';
 import { hasProgress } from '../engine/storage';
@@ -18,9 +18,10 @@ import { playSfx } from '../audio/sfx';
 // ------------------------------- Home ---------------------------------------
 
 export function HomeScreen() {
-  const { data, loadStatus, canSave } = useGame();
+  const { data, loadStatus, canSave, resetAll } = useGame();
   const { go } = useNav();
   const saved = hasProgress(data);
+  const [confirmNew, setConfirmNew] = useState(false);
   const notice =
     loadStatus === 'corrupt_reset'
       ? 'לא הצלחנו לקרוא את השמירה הקודמת, אז פתחנו מעבדה חדשה.'
@@ -65,6 +66,11 @@ export function HomeScreen() {
             >
               המשך משחק <IconArrowLeft size={28} />
             </BigButton>
+          ) : null}
+          {saved ? (
+            <BigButton variant="sun" onClick={() => setConfirmNew(true)} className="!text-lg" testId="new-game-btn">
+              <IconRefresh size={22} /> משחק חדש מההתחלה
+            </BigButton>
           ) : (
             <BigButton onClick={() => go({ name: 'level' })} className="!text-2xl !px-10 !min-h-[68px]" testId="start-btn">
               התחל משחק <IconArrowLeft size={28} />
@@ -76,7 +82,31 @@ export function HomeScreen() {
         </div>
         {!canSave && loadStatus !== 'unavailable' && loadStatus !== 'newer_version' && <p className="text-sm text-ink-soft">ההתקדמות לא נשמרת במכשיר הזה.</p>}
         <p className="text-sm text-ink-soft max-w-sm">בלי הרשמה ובלי פרטים אישיים. ההתקדמות נשמרת רק במכשיר הזה.</p>
+        <p className="text-xs text-ink-soft" data-testid="app-version" dir="ltr">
+          AlienLab v{__APP_VERSION__}
+        </p>
       </Page>
+      <Dialog open={confirmNew} title="להתחיל משחק חדש?" onClose={() => setConfirmNew(false)}>
+        <p className="text-lg mb-2">המשחק יתחיל מההתחלה, עם בחירת רמה חדשה.</p>
+        <p className="text-base mb-5 text-ink-soft">כל ההתקדמות שנשמרה במכשיר הזה תימחק: המילים, מה שקוסמו למד והנתונים באזור ההורים. אי אפשר לבטל את זה.</p>
+        <div className="flex gap-3 flex-wrap">
+          <button
+            type="button"
+            className="btn btn-primary"
+            data-testid="confirm-new-game"
+            onClick={() => {
+              resetAll();
+              setConfirmNew(false);
+              go({ name: 'level' });
+            }}
+          >
+            כן, להתחיל מההתחלה
+          </button>
+          <button type="button" className="btn btn-soft" data-testid="cancel-new-game" onClick={() => setConfirmNew(false)}>
+            לא, להמשיך
+          </button>
+        </div>
+      </Dialog>
     </div>
   );
 }

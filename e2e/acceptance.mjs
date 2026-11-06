@@ -600,6 +600,21 @@ const exposed3 = await p3.evaluate(() => document.querySelector('[data-testid=st
 await p3.screenshot({ path: SHOTS + 'd26-parents-level3.png', fullPage: true });
 note('אזור הורים ברמה 3', `עמודת הרכבה ל-DOG: "${spellCol}"; ${exposed3.replace(/\s+/g, ' ')}`, spellCol.includes('לבד') && exposed3.includes('מתוך 18'));
 note('שגיאות JavaScript ברמה 3', p3errors.length ? p3errors.join(' | ') : 'אין', p3errors.length === 0);
+// ---- "New game" from the home screen (same device, new player)
+await h3.click('[data-testid=home-btn]');
+const hasNewBtn = await h3.exists('[data-testid=new-game-btn]');
+const version = await h3.text('[data-testid=app-version]');
+await h3.click('[data-testid=new-game-btn]');
+await h3.click('[data-testid=cancel-new-game]');
+const keptAfterCancel = (await h3.save()).attempts.length;
+await h3.click('[data-testid=new-game-btn]');
+await p3.screenshot({ path: SHOTS + 'd27-new-game-dialog.png', fullPage: true });
+await h3.click('[data-testid=confirm-new-game]');
+const onLevel = await h3.exists('[data-testid=level-screen]');
+const afterNew = await h3.save();
+await h3.click('[data-testid=level-2]');
+const afterPick = await h3.save();
+note('משחק חדש מההתחלה (מסך הפתיחה)', `כפתור "משחק חדש": ${hasNewBtn}; ${version}; "ביטול" שמר ${keptAfterCancel} ניסיונות; אחרי אישור: מסך בחירת רמה ${onLevel}, ניסיונות שמורים ${afterNew?.attempts.length ?? 0}; רמה חדשה שנבחרה: ${afterPick.game.level}`, hasNewBtn && keptAfterCancel > 0 && onLevel && (afterNew?.attempts.length ?? 0) === 0 && afterPick.game.level === 2 && /v1\.2\.0/.test(version));
 await ctx3.close();
 
 // ---- Old (v1) save from the first version of the game still loads
