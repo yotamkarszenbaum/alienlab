@@ -150,8 +150,37 @@ function speakOne(text: string, lang: Lang, rate: number, token: number): Promis
   });
 }
 
+/**
+ * What the voice should actually say. Emojis and decorative symbols stay on
+ * screen, but are never read aloud ("smiling face with sweat…" sounds fake):
+ * emoji (incl. skin tones, flags, keycaps, joiners), arrows, check marks,
+ * scissors, bullets, box lines and the "___" gap.
+ */
+export function speakableText(text: string): string {
+  const PAUSE = '\uE000';
+  return (
+    text
+      // joiners, variation selectors, skin tones, flags, keycap marks
+      .replace(/[\u{1F3FB}-\u{1F3FF}\u{1F1E6}-\u{1F1FF}\u{E0020}-\u{E007F}\uFE0E\uFE0F\u200D\u20E3]/gu, '')
+      // an emoji often works like punctuation: keep a short pause instead
+      .replace(/\s*\p{Extended_Pictographic}+\s*/gu, ` ${PAUSE} `)
+      .replace(/[\u2190-\u21FF\u2B00-\u2BFF\u2700-\u27BF\u2500-\u257F\u25A0-\u25FF\u2600-\u26FF•·✓✔✗✘★☆]/gu, ' ')
+      .replace(/_{2,}/g, ' ')
+      .replace(/\(\s*\)/g, ' ')
+      .replace(new RegExp(`^[\\s${PAUSE}]+|[\\s${PAUSE}]+$`, 'g'), '')
+      .replace(new RegExp(`([.,!?:;…])[\\s${PAUSE}]+(?=\\S)`, 'g'), '$1 ')
+      .replace(new RegExp(`[\\s${PAUSE}]+([.,!?:;…])`, 'g'), '$1')
+      .replace(new RegExp(`\\s*${PAUSE}[\\s${PAUSE}]*`, 'g'), ', ')
+      .replace(/([.,!?:;])\1+/g, '$1')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  );
+}
+
 /** Speak a single text. Cancels anything already playing (avoids queues on repeated taps). */
-export async function speak(text: string, lang: Lang, rate?: number): Promise<boolean> {
+export async function speak(rawText: string, lang: Lang, rate?: number): Promise<boolean> {
+  const text = speakableText(rawText);
+  if (!text) return false;
   const s = synth();
   if (!s) {
     setStatus(lang, 'unavailable');
@@ -184,8 +213,10 @@ export function splitMixed(text: string): { text: string; lang: Lang }[] {
 }
 
 /** Read a Hebrew sentence aloud, switching to the English voice for English words. */
-export async function speakMixed(text: string): Promise<boolean> {
+export async function speakMixed(rawText: string): Promise<boolean> {
   if (status.he === 'unavailable') return false;
+  const text = speakableText(rawText);
+  if (!text) return false;
   const s = synth();
   if (!s) return false;
   const token = ++speakToken;

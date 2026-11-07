@@ -771,7 +771,10 @@ note('ניסיון לחזור למסך קודם (כפתור "אחורה" של ה
 const ctxVoice = await browser.newContext({ viewport: { width: 1180, height: 900 } });
 await ctxVoice.addInitScript(() => {
   window.__spoken = [];
-  const voices = [{ lang: 'en-US', name: 'Test English', localService: true, default: true, voiceURI: 'x' }];
+  const voices = [
+    { lang: 'en-US', name: 'Test English', localService: true, default: true, voiceURI: 'x' },
+    { lang: 'he-IL', name: 'Test Hebrew', localService: true, default: false, voiceURI: 'y' },
+  ];
   window.SpeechSynthesisUtterance = class {
     constructor(t) {
       this.text = t;
@@ -804,6 +807,11 @@ await pv.waitForSelector('[data-testid=choice-question]');
 await sleep(17000);
 const nudge = await hv.text('[data-testid=alien-line]');
 note('ילד שאינו בוחר תשובה', `אחרי 17 שניות בלי בחירה: "${nudge}"; עדיין באותה שאלה: ${(await hv.stepId()) === 'apple-practice'}`, nudge.includes('קחו את הזמן') && (await hv.stepId()) === 'apple-practice');
+await sleep(1500);
+const allSpoken = await pv.evaluate(() => window.__spoken.map((x) => x.text));
+const withEmoji = allSpoken.filter((t) => /[\p{Extended_Pictographic}\u2190-\u21FF\u2700-\u27BF]/u.test(t));
+const nudgeSpoken = allSpoken.find((t) => t.includes('קחו את הזמן'));
+note('קוסמו לא מקריא אימוג\'י וסימנים', `נשלחו לקול ${allSpoken.length} קטעים; עם אימוג'י או סימן: ${withEmoji.length}; השורה "קחו את הזמן 🙂" הוקראה כך: "${nudgeSpoken ?? '—'}"`, allSpoken.length > 3 && withEmoji.length === 0 && !!nudgeSpoken && !nudgeSpoken.includes('🙂'));
 record(4, 'השמעת מילה', 'מסך גילוי APPLE', 'לחיצה על כפתור השמע (א) במכשיר עם קול אנגלי, (ב) במכשיר בלי קולות', 'השמעה בפועל, או מצב חלופי ברור', `(א) נשלח למנוע הדיבור: ${JSON.stringify(spoken.find((s) => s.text === 'APPLE'))}, בלי הודעת "אין קול": ${noFallback}; (ב) Chrome ללא קולות: הוצג "${fallbackText.replace(/\s+/g, ' ')}"`, !!spoken.find((s) => s.text === 'APPLE' && s.lang === 'en-US') && noFallback && audioA);
 await ctxVoice.close();
 
