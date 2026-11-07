@@ -74,6 +74,7 @@ export function ChoiceQuestion({
   header,
   ignoreSize = false,
   layout = 'grid',
+  afterSuccess,
 }: {
   question: QuestionInstance;
   phase: 'learn' | 'review';
@@ -85,6 +86,8 @@ export function ChoiceQuestion({
   header?: ReactNode | ((supportLevel: number) => ReactNode);
   ignoreSize?: boolean;
   layout?: 'grid' | 'scene';
+  /** Extra content once answered (e.g. what changed in Kosmo's brain). */
+  afterSuccess?: ReactNode;
 }) {
   const { update, data } = useGame();
   const enStatus = useSpeechStatus('en');
@@ -314,6 +317,8 @@ export function ChoiceQuestion({
         )}
       </div>
       )}
+
+      {done && afterSuccess}
 
       <div className="flex items-center justify-between gap-3 flex-wrap pt-2">
         {!done ? <HelpButton onClick={help} level={support.level} /> : <span />}

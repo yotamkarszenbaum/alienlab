@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { buildPictureToWord, type QuestionInstance } from '../../engine/tasks';
+import { buildPictureToWord, CATEGORY_HE, contextPicture, type QuestionInstance } from '../../engine/tasks';
 import { optionCountFor } from '../../engine/hints';
 import { introducedWords, recordDelayedReview } from '../../engine/session';
 import { kosmoLearns, kosmoTaught } from '../../engine/kosmo';
@@ -23,9 +23,10 @@ function buildReminder(d: SaveData, wordId: string, k: number): QuestionInstance
   return {
     ...buildPictureToWord(getWord(wordId), introducedWords(d), {
       optionCount: optionCountFor(wp?.independentCorrect ?? 0, 3, 4),
-      // a different picture from the last time -> the meaning, not one image
       variant: (wp?.attempts ?? 0) + k + 3,
       taskId: `remind:${wordId}`,
+      // a NEW context, never a learning picture -> recall the meaning, not one image
+      picture: contextPicture(getWord(wordId), (wp?.attempts ?? 0) * 5 + k),
     }),
     context: 'new',
   };
@@ -49,8 +50,8 @@ export function ReminderStep({ words, onDone }: { words: string[]; onDone: () =>
         phase="review"
         askLine={
           kosmoKnew
-            ? `רגע לפני שמתחילים: את זה לימדתם אותי פעם, אבל אני כבר לא בטוח שאני זוכר 😅 איך קוראים לזה באנגלית?`
-            : `רגע לפני שמתחילים: את זה למדתם, ואני רוצה ללמוד מכם. איך קוראים לזה באנגלית?`
+            ? `רגע לפני שמתחילים: את זה לימדתם אותי פעם, אבל אני כבר לא בטוח שאני זוכר 😅 איך קוראים לזה באנגלית? (${CATEGORY_HE[w.category]}.)`
+            : `רגע לפני שמתחילים: את זה למדתם, ואני רוצה ללמוד מכם. איך קוראים לזה באנגלית? (${CATEGORY_HE[w.category]}.)`
         }
         successLine={(_, withHelp) =>
           withHelp ? `נכון! ${w.english} — ${w.hebrew}. עכשיו גם אני זוכר. נמשיך לתרגל אותה.` : `נכון! ${w.english} — ${w.hebrew}. זכרתם בעצמכם, ועכשיו גם אני נזכרתי!`

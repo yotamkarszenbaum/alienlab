@@ -11,7 +11,11 @@ import { buildMissionQuestion } from '../../engine/tasks';
 import { completeUnit } from '../../engine/gameProgress';
 import { isDueForReview, needsPractice } from '../../engine/learning';
 import { guessLabelHe } from '../../engine/alienMind';
-import { kosmoLearns, kosmoUsedRight, planMissionStep, type MissionPlan } from '../../engine/kosmo';
+import { brainChange, diagnoseOptions } from '../../engine/brain';
+import { DiagnoseCard } from '../../components/Diagnose';
+import { hasFeature } from '../../engine/alienMind';
+import { BrainChangeCard } from '../../components/BrainMap';
+import { kosmoBelief, kosmoLearns, kosmoUsedRight, planMissionStep, type MissionPlan } from '../../engine/kosmo';
 import { initialSupport } from '../../engine/hints';
 import { recordDelayedReview, recordWordAttempt } from '../../engine/session';
 import type { QuestionInstance } from '../../engine/tasks';
@@ -233,7 +237,17 @@ function MissionStepView({ m, step, variant, last, onAlone, onDone }: { m: Missi
   const [q] = useState(() => buildMissionQuestion(step, { variant, taskId: `${m.id}:${step.id}` }));
   const [plan] = useState<MissionPlan>(() => planMissionStep(data, step.wordIds, q.options, now()));
   const [dueAtStart] = useState(() => new Set(step.wordIds.filter((w) => isDueForReview(data.learning[w], now()))));
-  const [stage, setStage] = useState<'kosmo' | 'child' | 'done'>(plan.mode === 'tries' ? 'kosmo' : 'child');
+  const [stage, setStage] = useState<'kosmo' | 'diagnose' | 'child' | 'done'>(plan.mode === 'tries' ? 'kosmo' : 'child');
+  // A wrong try that comes from a belief the child taught (not a look-alike mix-up): diagnose it first.
+  const [diagWord] = useState<string | null>(() => {
+    if (plan.mode !== 'tries' || plan.correct || plan.mixedWith) return null;
+    return (
+      step.wordIds.find((w) => {
+        const b = kosmoBelief(data, w, now());
+        return b.kind === 'taught' && !hasFeature(step.answer, b.feature) && !!diagnoseOptions(WORDS_BY_ID[w], data.alien.concepts[w]);
+      }) ?? null
+    );
+  });
   const [kosmoWasWrong, setKosmoWasWrong] = useState(false);
   const [line, setLine] = useState(() =>
     plan.mode === 'tries'
@@ -289,8 +303,24 @@ function MissionStepView({ m, step, variant, last, onAlone, onDone }: { m: Missi
       playSfx('pop');
       setLine(askLineFor(plan, step, true));
     }
-    setStage('child');
+    setStage(diagWord ? 'diagnose' : 'child');
   }
+
+  if (stage === 'diagnose' && diagWord && plan.mode === 'tries')
+    return (
+      <DiagnoseCard
+        word={WORDS_BY_ID[diagWord]}
+        k={data.alien.concepts[diagWord]}
+        choice={q.options[plan.pick].item}
+        onSolved={(perfect, s) => {
+          update((d) =>
+            recordWordAttempt(d, { wordId: diagWord, taskId: `${m.id}:${step.id}:diagnose`, taskType: 'diagnose_kosmo', outcome: 'correct', attemptNumber: perfect ? 1 : s.wrong + 1, support: s, completed: true, phase: 'learn', context: 'new', now: now() }),
+          );
+          setLine(`בדיוק! 🔍 עכשיו אתם יודעים מה חשבתי. ${askLineFor(plan, step, true)}`);
+          setStage('child');
+        }}
+      />
+    );
 
   if (stage === 'kosmo' || (stage === 'done' && alone)) {
     const pick = plan.mode === 'tries' ? plan.pick : -1;
@@ -333,6 +363,9 @@ function MissionStepView({ m, step, variant, last, onAlone, onDone }: { m: Missi
       phase="learn"
       askLine={line}
       successLine={() => `${step.doneHe} ${learnReaction(data, step, source)}`}
+      afterSuccess={step.wordIds.map((w) => (
+        <BrainChangeCard key={w} change={brainChange(w, data.alien.concepts[w], kosmoLearns(data, w, step.answer, source, now()).data.alien.concepts[w])} />
+      ))}
       onComplete={(r) => {
         const t = now();
         update((d) => {

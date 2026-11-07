@@ -31,6 +31,10 @@ import { useGame, now } from '../../state/GameContext';
 import { playSfx } from '../../audio/sfx';
 import { speak } from '../../audio/speech';
 import type { ChoiceOption } from '../../engine/tasks';
+import { brainChange, type BrainChange } from '../../engine/brain';
+import { BrainChangeCard, BrainMap } from '../../components/BrainMap';
+import { DiagnoseCard } from '../../components/Diagnose';
+import { parseItemId } from '../../content/items';
 
 const MAX_TEACH_EXAMPLES = 3;
 
@@ -182,7 +186,7 @@ export function TeachStep({ stepId, conceptId, onDone }: { stepId: string; conce
   const setPhase = (patch: Partial<TeachStepState>) =>
     update((d) => ({ ...d, game: setTeachState(d.game, stepId, { ...teachStateOf(d.game, stepId), ...patch }) }));
 
-  const record = (taskType: 'teach_example' | 'check_alien' | 'repair_example', outcome: 'correct' | 'wrong' | 'not_helpful', support: SupportState, attemptNumber: number) =>
+  const record = (taskType: 'teach_example' | 'check_alien' | 'repair_example' | 'diagnose_kosmo', outcome: 'correct' | 'wrong' | 'not_helpful', support: SupportState, attemptNumber: number) =>
     update((d) =>
       recordWordAttempt(d, {
         wordId: conceptId,
@@ -213,7 +217,7 @@ type PhaseProps = {
   word: WordDef;
   k: ConceptKnowledge;
   ts: TeachStepState;
-  record: (t: 'teach_example' | 'check_alien' | 'repair_example', o: 'correct' | 'wrong' | 'not_helpful', s: SupportState, n: number) => void;
+  record: (t: 'teach_example' | 'check_alien' | 'repair_example' | 'diagnose_kosmo', o: 'correct' | 'wrong' | 'not_helpful', s: SupportState, n: number) => void;
   setPhase: (p: Partial<TeachStepState>) => void;
 };
 
@@ -264,8 +268,22 @@ const MAX_NEGATIVES = 2;
 
 // ------------------------------ Teach ---------------------------------------
 
+/** A small "peek into Kosmo's brain" toggle. */
+function BrainPeek({ wordId }: { wordId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col items-start gap-2">
+      <button type="button" className="btn btn-soft !min-h-[44px] !text-base" onClick={() => setOpen((o) => !o)} data-testid="brain-peek" aria-expanded={open}>
+        🧠 {open ? 'לסגור את המוח' : 'להציץ למוח של קוסמו'}
+      </button>
+      {open && <BrainMap wordId={wordId} />}
+    </div>
+  );
+}
+
 function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
   const { data, update } = useGame();
+  const [change, setChange] = useState<BrainChange | null>(null);
   const EN = word.english;
   const target = word.target;
   const canNeg = levelOfGame(data.game) >= 3;
@@ -296,6 +314,7 @@ function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
       return;
     }
     update((d) => setConcept(d, r.knowledge));
+    setChange(brainChange(word.id, k, r.knowledge));
     playSfx('teach');
     record('teach_example', 'correct', support, support.wrong + 1);
     setLastBad(null);
@@ -319,6 +338,7 @@ function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
       return;
     }
     update((d) => setConcept(d, r.knowledge));
+    setChange(brainChange(word.id, k, r.knowledge));
     if (r.effect === 'invalid') {
       playSfx('tryAgain');
       const s = onWrong(support, 'teach');
@@ -374,7 +394,9 @@ function TeachPhase({ word, k, record, setPhase }: PhaseProps) {
         {canNeg && <ModeToggle mode={mode} setMode={setMode} en={EN} />}
         <AlienThought word={word} k={k} />
         <ExamplesTray k={k} />
+        <BrainPeek wordId={word.id} />
       </div>
+      <BrainChangeCard change={change} />
       {support.level > 0 && (
         <HintPanel level={support.level}>
           <p>
@@ -618,6 +640,11 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
   const [support, setSupport] = useState<SupportState>(initialSupport);
   const [lastBad, setLastBad] = useState<string | null>(null);
   const [fixed, setFixed] = useState<null | 'resolved' | 'new_guess'>(null);
+  const [change, setChange] = useState<BrainChange | null>(null);
+  // Diagnosis first: the child works out what Kosmo misunderstands (only when he holds a wrong guess).
+  const [diagnosed, setDiagnosed] = useState(() => !guess || guess.dim === target.dim && guess.value === target.value);
+  const lastTest = k.tests[k.tests.length - 1];
+  const choiceItem = lastTest?.choice ? parseItemId(lastTest.choice) : null;
   const busy = useRef(false);
   const hintLine =
     (guess ? `קוסמו צריך לראות ${targetPhraseHe(target)} ${notGuessPhraseHe(guess)}.` : `קוסמו צריך לראות ${targetPhraseHe(target)}.`) +
@@ -640,6 +667,7 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
     }
     if (negative && (r.effect === 'resolved' || r.effect === 'new_guess')) {
       update((d) => setConcept(d, r.knowledge));
+      setChange(brainChange(word.id, k, r.knowledge));
       playSfx('teach');
       record('repair_example', 'correct', support, support.wrong + 1);
       setFixed(r.effect);
@@ -662,6 +690,7 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
     }
     if (r.effect === 'resolved' || r.effect === 'new_guess') {
       playSfx('teach');
+      setChange(brainChange(word.id, k, r.knowledge));
       record('repair_example', 'correct', byDemo ? { ...support, used: [...support.used, 'demo'] } : support, attemptNumber);
       setFixed(r.effect);
       const reaction = teachReaction(word, r.effect, r.knowledge, r.before.guess);
@@ -690,6 +719,22 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
 
   const helpful = options.find((o) => o.effect === 'resolved' || o.effect === 'new_guess');
 
+  if (!diagnosed)
+    return (
+      <DiagnoseCard
+        word={word}
+        k={k}
+        choice={choiceItem}
+        onSolved={(perfect, s) => {
+          if (!perfect && s.wrong > 0) record('diagnose_kosmo', 'wrong', initialSupport, 1);
+          record('diagnose_kosmo', 'correct', s, perfect ? 1 : s.wrong + 1);
+          setDiagnosed(true);
+          setMood('curious');
+          setLine(`בדיוק! 🔍 גיליתם מה אני חושב: ש-${EN} זה ${guessLabelHe(guess!)}. עכשיו בחרו דוגמה שתעזור לי להבין ש-${EN} זה ${word.teach!.dimLabelHe}.`);
+        }}
+      />
+    );
+
   return (
     <div className="flex flex-col gap-4">
       <AlienStage mood={mood} text={line} />
@@ -701,6 +746,7 @@ function RepairPhase({ word, k, ts, record, setPhase }: PhaseProps) {
         <AlienThought word={word} k={k} compact />
         <ExamplesTray k={k} />
       </div>
+      {fixed && <BrainChangeCard change={change} />}
       {support.level > 0 && !fixed && (
         <HintPanel level={support.level}>
           <p>{hintLine}</p>
@@ -764,6 +810,7 @@ function DonePhase({ word, k, onDone }: PhaseProps & { onDone: () => void }) {
       <AlienStage mood="success" text={line} />
       <div className="card p-5 flex flex-col items-center gap-4 text-center">
         <AlienThought word={word} k={k} />
+        <BrainMap wordId={word.id} compact />
         {has && (
           <div className="anim-pop rounded-3xl bg-sun border-3 border-ink px-5 py-3 text-xl font-extrabold" data-testid="ability-badge">
             ⭐ יכולת חדשה לקוסמו: {ability.labelHe}

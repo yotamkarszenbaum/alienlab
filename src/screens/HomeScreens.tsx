@@ -12,6 +12,7 @@ import { hasNewSteps, levelOfGame, setLevel, stepIndexOf, unitStatus, visibleSte
 import type { Level } from '../engine/types';
 import { dueWords, wordsNeedingPractice } from '../engine/session';
 import { kosmoDictionary } from '../engine/kosmo';
+import { workshopOpen, WORKSHOP_GOAL, WORKSHOP_MIN_WORDS } from '../engine/workshop';
 import { WORDS } from '../content/words';
 import { item } from '../content/items';
 import { playSfx } from '../audio/sfx';
@@ -312,9 +313,33 @@ export function LabScreen({ message }: { message?: string }) {
             })}
           </div>
 
+          <button
+            type="button"
+            className={`card p-4 flex items-center gap-4 text-start cursor-pointer ${workshopOpen(data) ? 'bg-[#f2fff9] border-teal' : ''}`}
+            onClick={() => go({ name: 'workshop' })}
+            data-testid="workshop-card"
+            data-open={workshopOpen(data) ? 'true' : 'false'}
+          >
+            <span className="text-4xl" aria-hidden>
+              🛠️
+            </span>
+            <span className="flex-1">
+              <span className="block text-xl font-extrabold">הסדנה של קוסמו</span>
+              <span className="block text-base">
+                {workshopOpen(data)
+                  ? `תנו לקוסמו הוראות במילים שלימדתם אותו, ובנו איתו חללית · 🚀 ${Math.min(data.game.workshopParts.length, WORKSHOP_GOAL)}/${WORKSHOP_GOAL} חלקים`
+                  : `🔒 נפתחת כשקוסמו יידע ${WORKSHOP_MIN_WORDS} מילים שלימדתם אותו (עכשיו: ${Math.min(kosmoDictionary(data).length, WORKSHOP_MIN_WORDS)})`}
+              </span>
+            </span>
+            <IconArrowLeft size={28} />
+          </button>
+
           <div className="flex flex-wrap gap-3 justify-center">
+            <BigButton variant="soft" onClick={() => go({ name: 'mastery' })} testId="mastery-btn">
+              🗺️ המפה שלי
+            </BigButton>
             <BigButton variant="soft" onClick={() => go({ name: 'brain' })} testId="brain-btn">
-              <IconBrain /> מה קוסמו יודע?
+              <IconBrain /> המוח של קוסמו
               {kosmoDictionary(data).length > 0 && (
                 <span className="rounded-full bg-good-bg border-2 border-good text-good text-base px-2" data-testid="dictionary-count" data-count={kosmoDictionary(data).length}>
                   📖 {kosmoDictionary(data).length} מילים ממך

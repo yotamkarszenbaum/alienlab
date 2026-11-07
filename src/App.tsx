@@ -6,6 +6,8 @@ import { HomeScreen, IntroScreen, LabScreen, LevelScreen } from './screens/HomeS
 import { UnitScreen } from './screens/UnitScreen';
 import { ReviewScreen } from './screens/ReviewScreen';
 import { BrainScreen } from './screens/BrainScreen';
+import { WorkshopScreen } from './screens/WorkshopScreen';
+import { MasteryScreen } from './screens/MasteryScreen';
 import { ParentsScreen } from './screens/ParentsScreen';
 import { initSpeech, stopSpeech } from './audio/speech';
 
@@ -69,6 +71,12 @@ function Shell() {
       break;
     case 'brain':
       body = <BrainScreen />;
+      break;
+    case 'workshop':
+      body = <WorkshopScreen />;
+      break;
+    case 'mastery':
+      body = <MasteryScreen />;
       break;
     case 'parents':
       body = <ParentsScreen />;

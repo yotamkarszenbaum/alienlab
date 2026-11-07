@@ -8,6 +8,8 @@ export type Screen =
   | { name: 'unit'; unitId: string }
   | { name: 'review'; mode: 'due' | 'practice' }
   | { name: 'brain' }
+  | { name: 'workshop' }
+  | { name: 'mastery' }
   | { name: 'parents' };
 
 export interface Nav {

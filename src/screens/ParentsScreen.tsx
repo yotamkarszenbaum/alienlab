@@ -1,3 +1,4 @@
+import { MasteryMap } from '../components/MasteryMap';
 import { useMemo, useState } from 'react';
 import { BigButton, Dialog, Page, TopBar } from '../components/ui';
 import { useGame, now } from '../state/GameContext';
@@ -141,6 +142,11 @@ export function ParentsScreen() {
               <b>מילים לתרגול נוסף:</b> {stats.practice.map((w) => `${w.english} (${w.hebrew})`).join(', ')}
             </p>
           )}
+
+          <section className="card p-4 flex flex-col gap-2" data-testid="parents-mastery">
+            <h2 className="text-xl font-extrabold">מפת שליטה במילים (5 שלבים)</h2>
+            <MasteryMap parent />
+          </section>
 
           <section className="card p-4 overflow-x-auto">
             <h2 className="text-xl font-extrabold mb-3">התקדמות לפי מילה</h2>

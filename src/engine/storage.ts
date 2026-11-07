@@ -7,7 +7,7 @@
 //  - storage not available   -> in-memory mode (progress not saved)
 // ---------------------------------------------------------------------------
 import type { AlienKnowledge, AttemptRecord, ConceptKnowledge, GameProgress, KosmoSource, KosmoWord, Level, SaveData, Settings, WordProgress } from './types';
-import { emptyWordProgress, MAX_ATTEMPT_LOG } from './learning';
+import { CONTEXT_TYPES, emptyWordProgress, MAX_ATTEMPT_LOG, RECALL_TYPES } from './learning';
 import { emptyAlien, emptyConcept } from './alienMind';
 import { emptyGame } from './gameProgress';
 import { WORDS } from '../content/words';
@@ -71,6 +71,8 @@ function normWord(x: unknown): WordProgress {
     spellIndependent: num(x.spellIndependent),
     spellWithHelp: num(x.spellWithHelp),
     spellWrong: num(x.spellWrong),
+    recallIndependent: num(x.recallIndependent),
+    contextUse: num(x.contextUse),
   };
 }
 
@@ -151,6 +153,7 @@ function normGame(x: unknown): GameProgress {
     completedMissions: strArr(x.completedMissions),
     inventory: strArr(x.inventory),
     activities: num(x.activities),
+    workshopParts: strArr(x.workshopParts),
     startedAt: optNum(x.startedAt),
     lastPlayedAt: optNum(x.lastPlayedAt),
   };
@@ -180,11 +183,20 @@ export function normalize(raw: Record<string, unknown>, now: number): SaveData {
   const base = newSave(now);
   const learning: Record<string, WordProgress> = { ...base.learning };
   if (isObj(raw.learning)) for (const w of WORDS) if (w.id in raw.learning) learning[w.id] = normWord(raw.learning[w.id]);
+  const attempts = normAttempts(raw.attempts);
+  // Saves from before v1.7 have no recall / context counters: rebuild them from the attempt log (real actions only).
+  if (isObj(raw.learning))
+    for (const w of WORDS) {
+      const r = raw.learning[w.id];
+      if (!isObj(r) || 'recallIndependent' in r) continue;
+      const mine = attempts.filter((a) => a.wordId === w.id && a.independent);
+      learning[w.id] = { ...learning[w.id], recallIndependent: mine.filter((a) => RECALL_TYPES.includes(a.taskType)).length, contextUse: mine.filter((a) => CONTEXT_TYPES.includes(a.taskType)).length };
+    }
   return {
     version: SCHEMA_VERSION,
     createdAt: num(raw.createdAt, now),
     learning,
-    attempts: normAttempts(raw.attempts),
+    attempts,
     alien: normAlien(raw.alien),
     game: normGame(raw.game),
     settings: normSettings(raw.settings),

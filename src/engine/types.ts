@@ -59,7 +59,8 @@ export type TaskType =
   | 'build_sentence' // 8. build an English phrase from word chips (levels 2–3)
   | 'fill_blank' // 9. complete a sentence from a word bank (levels 2–3)
   | 'read' // 10. read a short message and answer with pictures (level 3)
-  | 'fix_kosmo'; // 11. catch and fix Kosmo's mistake in an English sentence (levels 2–3)
+  | 'fix_kosmo' // 11. catch and fix Kosmo's mistake in an English sentence (levels 2–3)
+  | 'diagnose_kosmo'; // 12. work out what Kosmo misunderstands before repairing it
 
 export type DiscoverVisual =
   | { type: 'single'; item: ItemSpec }
@@ -328,6 +329,10 @@ export interface WordProgress {
   spellIndependent: number;
   spellWithHelp: number;
   spellWrong: number;
+  /** Independent successes where the child had to RECALL the English word (picture → word, fill in, fix/teach Kosmo). */
+  recallIndependent: number;
+  /** Independent successes using the word inside a sentence / mission (context, not a single flash card). */
+  contextUse: number;
 }
 
 // ---------------------------- Alien knowledge ------------------------------
@@ -399,6 +404,8 @@ export interface GameProgress {
   /** Things the alien obtained in missions. */
   inventory: string[];
   activities: number;
+  /** Kosmo's workshop: instructions Kosmo carried out by himself (each = a spaceship part). */
+  workshopParts: string[];
   startedAt?: number;
   lastPlayedAt?: number;
 }

@@ -11,6 +11,8 @@ import { inRange } from '../../content/levels';
 import { unitWordIds } from '../../content/units';
 import { getWord, WORDS_BY_ID } from '../../content/words';
 import { useGame, now } from '../../state/GameContext';
+import { brainChange, type BrainChange } from '../../engine/brain';
+import { BrainChangeCard } from '../../components/BrainMap';
 import { useSpeechStatus, speak } from '../../audio/speech';
 import { playSfx } from '../../audio/sfx';
 import type { KosmoSource, Level, MixupRoundDef, SaveData, UnitDef } from '../../engine/types';
@@ -80,6 +82,7 @@ function RoundView({
   const busy = useRef(false);
   const choices = useMemo(() => seededShuffle(round.choices, round.id.length * 13 + roundNo), [round, roundNo]);
   const said = plan.kosmoTokens;
+  const [change, setChange] = useState<BrainChange | null>(null);
 
   const guard = () => {
     if (busy.current) return false;
@@ -101,6 +104,10 @@ function RoundView({
   }
 
   function finish(caught: boolean, s: SupportState, wasPerfect: boolean) {
+    if (plan.mode !== 'right' && !GRAMMAR[round.focus]) {
+      const source: KosmoSource = plan.mode === 'wrong' ? 'fix' : plan.reason === 'fading' ? 'remind' : 'show';
+      setChange(brainChange(round.focus, data.alien.concepts[round.focus], kosmoLearns(data, round.focus, round.picture, source, now()).data.alien.concepts[round.focus]));
+    }
     setStage('done');
     record({ perfect: wasPerfect, caught, plan }, s);
     void speak(sentenceOf(round.tokens), 'en');
@@ -311,6 +318,8 @@ function RoundView({
           </div>
         </div>
       )}
+
+      {stage === 'done' && <BrainChangeCard change={change} />}
 
       {stage === 'done' && !perfect && round.wordIds.length > 0 && (
         <div className="card p-3 flex flex-wrap items-center gap-2" data-testid="mixup-reminder">

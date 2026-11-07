@@ -2,8 +2,8 @@
 // Task engine: turns content definitions into concrete question instances
 // (options, correct answer, difficulty) and evaluates answers per word.
 // ---------------------------------------------------------------------------
-import type { ItemSpec, MissionStepDef, ReadQuestionDef, SentenceDef, TaskType, WordDef } from './types';
-import { catalog, describeItemHe, itemId, sameItem } from '../content/items';
+import type { ItemSpec, ItemState, Kind, MissionStepDef, Pos, ReadQuestionDef, SentenceDef, Size, TaskType, WordDef } from './types';
+import { catalog, describeItemHe, itemId, placedCatalog, sameItem } from '../content/items';
 import { WORDS, WORDS_BY_ID } from '../content/words';
 import { hasFeature, salientFeatures, seededShuffle } from './alienMind';
 
@@ -79,9 +79,9 @@ export function buildWordToPicture(
 export function buildPictureToWord(
   word: WordDef,
   introduced: string[],
-  opts: { optionCount: number; variant: number; taskId: string; easy?: boolean },
+  opts: { optionCount: number; variant: number; taskId: string; easy?: boolean; picture?: ItemSpec },
 ): QuestionInstance {
-  const picture = word.positiveExamples[opts.variant % word.positiveExamples.length];
+  const picture = opts.picture ?? word.positiveExamples[opts.variant % word.positiveExamples.length];
   // A word is a fair distractor only if the picture does NOT show it (no two right answers).
   const shows = (w: WordDef) => hasFeature(picture, w.target) || (w.target.dim === 'kind' && picture.rel?.ref === w.target.value);
   const candidates = WORDS.filter((w) => w.id !== word.id && introduced.includes(w.id) && !shows(w));
@@ -215,3 +215,55 @@ export function evaluatePerWord(q: QuestionInstance, chosen: ChoiceOption): Reco
   }
   return out;
 }
+
+// ------------------------------ new contexts --------------------------------
+
+const CONTEXT_KINDS: Kind[] = ['ball', 'cat', 'dog', 'key', 'apple', 'cup', 'star'];
+
+/** Does a picture show a word (its own feature, or the table / box it is on / in)? */
+export function pictureShows(i: ItemSpec, w: WordDef): boolean {
+  return hasFeature(i, w.target) || (w.target.dim === 'kind' && i.rel?.ref === w.target.value);
+}
+
+/**
+ * A picture of the word in a NEW context — never one of the pictures it was
+ * learned with (other colours, sizes, things, places). Used by memory missions
+ * and Kosmo's reminders, so recall depends on the meaning, not on one image.
+ */
+export function contextPicture(word: WordDef, seed: number): ItemSpec {
+  const t = word.target;
+  let pool: ItemSpec[];
+  switch (t.dim) {
+    case 'pos':
+      pool = placedCatalog(CONTEXT_KINDS, [t.value as Pos]);
+      break;
+    case 'count':
+      pool = catalog({ kinds: CONTEXT_KINDS }).map((i) => ({ ...i, count: Number(t.value) as 2 | 3 }));
+      break;
+    case 'state':
+      pool = catalog({ kinds: ['door', 'box'], states: [t.value as ItemState] });
+      break;
+    case 'size':
+      pool = catalog({ kinds: CONTEXT_KINDS, sizes: [t.value as Size] });
+      break;
+    case 'kind':
+      pool = t.value === 'table' ? placedCatalog(CONTEXT_KINDS, ['on', 'under']) : catalog({ kinds: [t.value as Kind], sizes: ['normal', 'big', 'small'] });
+      break;
+    default:
+      // colours: other things and other sizes than the learning pictures
+      pool = catalog({ sizes: ['big', 'small', 'normal'] }).filter((i) => hasFeature(i, t));
+  }
+  const fresh = pool.filter((i) => pictureShows(i, word) && !word.positiveExamples.some((p) => sameItem(p, i)));
+  const list = fresh.length ? fresh : word.positiveExamples;
+  return list[Math.abs(seed) % list.length];
+}
+
+export const CATEGORY_HE: Record<WordDef['category'], string> = {
+  object: 'זה שם של דבר',
+  animal: 'זה שם של חיה',
+  color: 'זה צבע',
+  size: 'זה גודל',
+  action: 'זו פעולה',
+  number: 'זה מספר',
+  place: 'זו מילה שאומרת איפה',
+};

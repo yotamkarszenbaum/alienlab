@@ -24,8 +24,15 @@ export function emptyWordProgress(): WordProgress {
     spellIndependent: 0,
     spellWithHelp: 0,
     spellWrong: 0,
+    recallIndependent: 0,
+    contextUse: 0,
   };
 }
+
+/** Task types where the child recalls the English word (it is not shown as the prompt). */
+export const RECALL_TYPES: string[] = ['picture_to_word', 'fill_blank', 'fix_kosmo'];
+/** Task types where the word is used inside a sentence, a message or a mission. */
+export const CONTEXT_TYPES: string[] = ['mission', 'fill_blank', 'build_sentence', 'read', 'fix_kosmo'];
 
 export function markIntroduced(wp: WordProgress, now: number): WordProgress {
   if (wp.introduced) return wp;
@@ -126,6 +133,8 @@ export function applyAttempt(wp: WordProgress, a: AttemptRecord): WordProgress {
     next.notHelpful = wp.notHelpful + 1;
   } else if (a.independent) {
     next.independentCorrect = wp.independentCorrect + 1;
+    if (RECALL_TYPES.includes(a.taskType)) next.recallIndependent = (wp.recallIndependent ?? 0) + 1;
+    if (CONTEXT_TYPES.includes(a.taskType)) next.contextUse = (wp.contextUse ?? 0) + 1;
     if (a.context === 'new') next.contextIndependent = wp.contextIndependent + 1;
     mark = 'i';
   } else {

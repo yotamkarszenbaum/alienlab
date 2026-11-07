@@ -69,6 +69,7 @@ function helpers(page) {
         await click(right === 'true' ? '[data-testid=judge-right]' : '[data-testid=judge-wrong]');
         await click(right === 'true' ? '[data-testid=next-btn]' : '[data-testid=help-alien-btn]');
       } else if (phase === 'repair') {
+        if (await exists('[data-testid=diagnose-options]')) await click('[data-testid=diagnose-options] button[data-correct=true]');
         await click('[data-testid=repair-options] button[data-correct=true]');
         await click('[data-testid=retest-btn]');
       } else if (phase === 'done') {
@@ -269,6 +270,7 @@ await h.click('[data-testid=intro-start]');
 const inLab = await h.exists('[data-testid=lab-screen]');
 record(1, 'פתיחת משחק חדש', 'דפדפן נקי, ללא שמירה', 'כניסה → "התחל משחק" → בחירת רמה לפי טווח גילים → היכרות → "בואו נתחיל"', 'הגעה למעבדה בלי הרשמה ובלי שדות קלט', `כפתור התחלה: ${hasStart}, שדות קלט במסך הפתיחה ובבחירת הרמה: ${inputsOnHome + levelInputs}, מסך בחירת רמה (ללא שאלת גיל מדויק): ${levelScreen}, הגיע למעבדה: ${inLab}`, hasStart && inputsOnHome === 0 && levelInputs === 0 && levelScreen && inLab);
 await page.screenshot({ path: SHOTS + 'd03-lab.png' });
+const workshopLockedAtStart = (await page.getAttribute('[data-testid=workshop-card]', 'data-open')) === 'false';
 
 // ---- Section 15: locked unit
 await h.click('[data-testid=station-colors]');
@@ -427,7 +429,33 @@ const earthStatus = await page.getAttribute('[data-testid=station-earth]', 'data
 const colorsStatus = await page.getAttribute('[data-testid=station-colors]', 'data-status');
 record(15, 'שמירת התקדמות', 'אחרי השלמת יחידה 1', 'רענון הדף → "המשך משחק"', 'ההתקדמות נשמרה', `כפתור "המשך משחק": ${cont}, יחידה 1: ${earthStatus}, יחידה 2: ${colorsStatus}`, cont && earthStatus === 'completed' && colorsStatus === 'available');
 
+// ---- Teach & Unlock: after station 1 Kosmo knows enough words → his workshop opens
+const workshopOpenNow = (await page.getAttribute('[data-testid=workshop-card]', 'data-open')) === 'true';
+await h.click('[data-testid=workshop-card]');
+await page.waitForSelector('[data-testid=command-builder]');
+const chipState = await page.locator('[data-testid=command-builder] button[data-unlocked]').evaluateAll((b) => b.map((x) => `${x.dataset.testid.replace('chip-', '')}:${x.dataset.unlocked}`));
+await h.click('[data-testid=chip-ball]');
+const ballMatches = await page.getAttribute('[data-testid=command-status]', 'data-matches');
+const sendLockedForBall = (await page.getAttribute('[data-testid=send-command]', 'aria-disabled')) === 'true';
+await h.click('[data-testid=chip-ball]'); // un-pick
+await h.click('[data-testid=chip-dog]');
+const dogMatches = await page.getAttribute('[data-testid=command-status]', 'data-matches');
+await page.screenshot({ path: SHOTS + 'd09b-workshop.png', fullPage: true });
+await h.click('[data-testid=send-command]');
+const kosmoOkInWorkshop = (await page.getAttribute('[data-testid=kosmo-right]', 'data-kosmo-correct')) === 'true';
+await h.click('[data-testid=kosmo-right]');
+const partShown = await h.exists('[data-testid=new-part]');
+await page.screenshot({ path: SHOTS + 'd09c-workshop-part.png', fullPage: true });
+const sWs = await h.save();
+note(
+  'הידע פותח אפשרויות: הסדנה של קוסמו',
+  `במעבדה בהתחלה הסדנה נעולה: ${workshopLockedAtStart}; אחרי תחנה 1 נפתחה: ${workshopOpenNow}; מילים בהוראות: ${chipState.join(', ')}; "BALL" מתאים ל-${ballMatches} דברים (שליחה נעולה: ${sendLockedForBall}); "DOG" מתאים ל-${dogMatches}; קוסמו עשה לבד: ${kosmoOkInWorkshop}; חלק חדש לחללית: ${partShown}; נשמר: ${JSON.stringify(sWs.game.workshopParts)}`,
+  workshopLockedAtStart && workshopOpenNow && chipState.includes('ball:true') && chipState.includes('red:false') && ballMatches === '2' && sendLockedForBall && dogMatches === '1' && kosmoOkInWorkshop && partShown && sWs.game.workshopParts.includes('dog'),
+);
+await h.click('[data-testid=home-btn]');
+
 // ---- Unit 2 up to teach-red
+let brainChangeInfo = null;
 await h.click('[data-testid=station-colors]');
 await h.playUnit({
   'teach-red': async () => {
@@ -462,6 +490,16 @@ await h.playUnit({
     note('רענון הדפדפן בזמן שהחייזר מבצע פעולה', `חזרה לאותו שלב בדיקה, אותה בחירה (${choice2})`, choice1 === choice2);
     await h.click('[data-testid=judge-wrong]');
     await h.click('[data-testid=help-alien-btn]');
+    // Diagnosis: what does Kosmo think RED means?
+    await page.waitForSelector('[data-testid=diagnose-options]');
+    const diagOpts = await page.locator('[data-testid=diagnose-options] button').evaluateAll((b) => b.map((x) => `${x.innerText.trim()}${x.dataset.correct === 'true' ? '✓' : ''}`));
+    await page.screenshot({ path: SHOTS + 'd11b-diagnose.png', fullPage: true });
+    await h.click('[data-testid=diagnose-options] button[data-correct=false]');
+    const diagHint = await h.text('[data-testid=alien-line]');
+    await h.click('[data-testid=diagnose-options] button[data-correct=true]');
+    const sDiag = await h.save();
+    const diagAttempts = sDiag.attempts.filter((a) => a.taskType === 'diagnose_kosmo').map((a) => `${a.outcome}${a.independent ? '(לבד)' : ''}`);
+    note('אבחון לפני תיקון: מה קוסמו לא מבין?', `אפשרויות: ${diagOpts.join(' / ')}; אחרי תשובה שגויה: "${diagHint.replace(/\s+/g, ' ').slice(0, 70)}…"; נרשם: ${diagAttempts.join(', ')}`, diagOpts.includes('תפוח✓') && diagOpts.some((o) => o.startsWith('הצבע האדום')) && diagAttempts.includes('wrong') && diagAttempts.some((a) => a.startsWith('correct')) && !diagAttempts.includes('correct(לבד)'));
     const rq = await page.getAttribute('[data-testid=repair-question]', 'data-question');
     await page.screenshot({ path: SHOTS + 'd12-repair.png', fullPage: true });
     // Test 13: corrective example changes knowledge and the next test
@@ -469,6 +507,9 @@ await h.playUnit({
     if (invalidOpt) await h.click(`[data-testid="${invalidOpt}"]`);
     const hintAfterBad = await h.exists('[data-testid=hint-panel]');
     await h.click('[data-testid=repair-options] button[data-correct=true]');
+    const bc = await page.locator('[data-testid=brain-change]').first();
+    brainChangeInfo = { before: await bc.getAttribute('data-before'), after: await bc.getAttribute('data-after') };
+    await page.screenshot({ path: SHOTS + 'd12b-brain-change.png', fullPage: true });
     const und2 = await page.getAttribute('[data-testid=alien-thought]', 'data-understanding');
     const guess2 = await page.getAttribute('[data-testid=alien-thought]', 'data-guess');
     await h.click('[data-testid=retest-btn]');
@@ -560,9 +601,11 @@ const reviewAfter = await h.exists('[data-testid=review-station]');
 await page.screenshot({ path: SHOTS + 'd19-lab-review.png', fullPage: true });
 await h.click('[data-testid=review-station]');
 let reviewed = 0;
+const memoryInfo = [];
 for (let g = 0; g < 6; g++) {
   if (await h.exists('[data-testid=review-done]')) break;
   if (g === 0) await page.screenshot({ path: SHOTS + 'd20-review.png', fullPage: true });
+  memoryInfo.push(`${await page.getAttribute('[data-testid=review-screen]', 'data-word')}:${await page.getAttribute('[data-testid=review-screen]', 'data-mode')}:${await page.getAttribute('[data-testid=review-screen]', 'data-new-context')}`);
   await h.click('[data-testid=options] button[data-correct=true]');
   await h.click('[data-testid=next-btn]');
   reviewed++;
@@ -570,7 +613,20 @@ for (let g = 0; g < 6; g++) {
 const sR = await h.save();
 const delayed = Object.values(sR.learning).flatMap((w) => w.delayedReviews);
 record(16, 'חזרה מאוחרת', 'סיום 3 היחידות', 'בדיקה מיידית, ואז הזזת שעון המשחק ביום (כלי מפתחים מסומן)', 'אין חזרה מיד אחרי הלמידה; אחרי מרווח מוצע תרגול חוזר', `תחנת זיכרון מיד אחרי הלמידה: ${!noReviewYet || reviewBefore}; אחרי יום: ${reviewAfter}; שאלות חזרה: ${reviewed}; חזרות מאוחרות שנשמרו: ${delayed.length}`, noReviewYet && !reviewBefore && reviewAfter && delayed.length === reviewed && reviewed > 0);
+note('משימת זיכרון בהקשר חדש', `מילה:סוג שאלה:תמונה חדשה — ${memoryInfo.join(', ')}`, memoryInfo.length > 0 && memoryInfo.every((x) => x.endsWith(':picture_to_word:true')));
 await h.click('[data-testid=back-to-lab]');
+
+// ---- Mastery map: five milestones from real actions only
+await h.click('[data-testid=mastery-btn]');
+await page.waitForSelector('[data-testid=mastery-screen]');
+await page.screenshot({ path: SHOTS + 'd20b-mastery.png', fullPage: true });
+const sM = await h.save();
+const msCount = async (m) => Number(await page.getAttribute(`[data-testid=ms-sum-${m}]`, 'data-count'));
+const ms = { meaning: await msCount('meaning'), alone: await msCount('alone'), recall: await msCount('recall'), context: await msCount('context'), later: await msCount('later') };
+const laterData = Object.values(sM.learning).filter((w) => w.delayedReviews.some((r) => r.result === 'independent')).length;
+const aloneData = Object.values(sM.learning).filter((w) => w.introduced && w.independentCorrect > 0).length;
+note('מפת שליטה: 5 שלבים לפי פעולות אמיתיות', `מכיר ${ms.meaning}, לבד ${ms.alone}, נזכר ${ms.recall}, במשפט/משימה ${ms.context}, אחרי זמן ${ms.later} | בנתונים: לבד ${aloneData}, אחרי זמן ${laterData}`, ms.meaning === 12 && ms.alone === aloneData && ms.later === laterData && ms.later > 0 && ms.recall > 0 && ms.context > 0 && ms.later <= ms.alone);
+await h.click('[data-testid=home-btn]');
 
 // ---- Test 9 + 17: data in the parents area
 await gotoParents(page, h);
@@ -596,6 +652,14 @@ await h.click('[data-testid=home-btn]');
 await h.click('[data-testid=continue-btn]');
 await h.click('[data-testid=brain-btn]');
 await page.screenshot({ path: SHOTS + 'd22-brain.png', fullPage: true });
+const redLinks = await page.getAttribute('[data-testid=brain-map-red]', 'data-links');
+const timelineN = Number(await page.getAttribute('[data-testid=brain-timeline]', 'data-count'));
+const mixupCards = await page.locator('[data-testid^=brain-][data-category=mixup]').count();
+note(
+  'המוח השקוף של קוסמו',
+  `RED במוח: ${redLinks}; בתיקון הוצג שינוי: ${brainChangeInfo?.before} → ${brainChangeInfo?.after}; שינויים אחרונים במוח: ${timelineN}; מילים שקוסמו עוד מתבלבל בהן: ${mixupCards}`,
+  !!redLinks && redLinks.includes('guess:color:red') && redLinks.includes('cut:kind:apple') && brainChangeInfo?.before === 'kind:apple' && brainChangeInfo?.after === 'color:red' && timelineN > 0,
+);
 await h.click('[data-testid=home-btn]');
 
 // ---- Levels: raising the level mid-game adds the new words, nothing is lost

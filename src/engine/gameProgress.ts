@@ -23,6 +23,7 @@ export function emptyGame(): GameProgress {
     completedMissions: [],
     inventory: [],
     activities: 0,
+    workshopParts: [],
   };
 }
 
