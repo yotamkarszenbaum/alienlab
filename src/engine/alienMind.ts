@@ -77,7 +77,7 @@ export function emptyConcept(conceptId: string): ConceptKnowledge {
 }
 
 export function emptyAlien(): AlienKnowledge {
-  return { concepts: {}, abilities: [] };
+  return { concepts: {}, abilities: [], lexicon: {} };
 }
 
 export function examplesOf(k: ConceptKnowledge | undefined): ItemSpec[] {

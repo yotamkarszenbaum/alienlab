@@ -11,6 +11,7 @@ import { LEVELS, LEVELS_BY_ID } from '../content/levels';
 import { hasNewSteps, levelOfGame, setLevel, stepIndexOf, unitStatus, visibleSteps } from '../engine/gameProgress';
 import type { Level } from '../engine/types';
 import { dueWords, wordsNeedingPractice } from '../engine/session';
+import { kosmoDictionary } from '../engine/kosmo';
 import { WORDS } from '../content/words';
 import { item } from '../content/items';
 import { playSfx } from '../audio/sfx';
@@ -314,6 +315,11 @@ export function LabScreen({ message }: { message?: string }) {
           <div className="flex flex-wrap gap-3 justify-center">
             <BigButton variant="soft" onClick={() => go({ name: 'brain' })} testId="brain-btn">
               <IconBrain /> מה קוסמו יודע?
+              {kosmoDictionary(data).length > 0 && (
+                <span className="rounded-full bg-good-bg border-2 border-good text-good text-base px-2" data-testid="dictionary-count" data-count={kosmoDictionary(data).length}>
+                  📖 {kosmoDictionary(data).length} מילים ממך
+                </span>
+              )}
             </BigButton>
             {practice.length > 0 && (
               <BigButton variant="soft" onClick={() => go({ name: 'review', mode: 'practice' })} testId="practice-btn">

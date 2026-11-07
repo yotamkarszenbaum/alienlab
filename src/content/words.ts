@@ -14,6 +14,7 @@ export const WORDS: WordDef[] = [
   // ------------------------------ Unit 1 ---------------------------------
   {
     id: 'apple',
+    kosmoMixesUp: 'ball',
     kosmoSpelling: 'EPEL',
     english: 'APPLE',
     hebrew: 'תפוח',
@@ -31,6 +32,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'ball',
+    kosmoMixesUp: 'apple',
     kosmoSpelling: 'BOL',
     english: 'BALL',
     hebrew: 'כדור',
@@ -48,6 +50,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'cat',
+    kosmoMixesUp: 'dog',
     kosmoSpelling: 'KAT',
     english: 'CAT',
     hebrew: 'חתול',
@@ -65,6 +68,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'dog',
+    kosmoMixesUp: 'cat',
     kosmoSpelling: 'DOGG',
     english: 'DOG',
     hebrew: 'כלב',
@@ -91,6 +95,7 @@ export const WORDS: WordDef[] = [
   // ---- Unit 1 extra words (higher levels) ----
   {
     id: 'car',
+    kosmoMixesUp: 'cat',
     example: { en: 'I HAVE A RED CAR.', he: 'יש לי מכונית אדומה.', picture: item('car', 'red') },
     english: 'CAR',
     hebrew: 'מכונית',
@@ -109,6 +114,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'hat',
+    kosmoMixesUp: 'cat',
     example: { en: 'MY HAT IS BLUE.', he: 'הכובע שלי כחול.', picture: item('hat', 'blue') },
     english: 'HAT',
     hebrew: 'כובע',
@@ -127,6 +133,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'cup',
+    kosmoMixesUp: 'car',
     example: { en: 'MY CUP IS YELLOW.', he: 'הכוס שלי צהובה.', picture: item('cup', 'yellow') },
     kosmoSpelling: 'KAP',
     english: 'CUP',
@@ -148,6 +155,7 @@ export const WORDS: WordDef[] = [
   // ------------------------------ Unit 2 ---------------------------------
   {
     id: 'red',
+    kosmoMixesUp: 'blue',
     kosmoSpelling: 'RAD',
     english: 'RED',
     hebrew: 'אדום',
@@ -172,6 +180,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'blue',
+    kosmoMixesUp: 'red',
     english: 'BLUE',
     hebrew: 'כחול',
     sayItHe: 'בְּלוּ',
@@ -237,6 +246,7 @@ export const WORDS: WordDef[] = [
   // ---- Unit 2 extra words (higher levels) ----
   {
     id: 'green',
+    kosmoMixesUp: 'yellow',
     example: { en: 'THE APPLE IS GREEN.', he: 'התפוח ירוק.', picture: item('apple', 'green') },
     kosmoSpelling: 'GRIN',
     english: 'GREEN',
@@ -263,6 +273,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'small',
+    kosmoMixesUp: 'big',
     example: { en: 'I HAVE A SMALL DOG.', he: 'יש לי כלב קטן.', picture: item('dog', 'brown', 'small') },
     kosmoSpelling: 'SMOL',
     english: 'SMALL',
@@ -284,6 +295,7 @@ export const WORDS: WordDef[] = [
   // ---- Unit 2, level 3: numbers (plurals) ----
   {
     id: 'two',
+    kosmoMixesUp: 'three',
     example: { en: 'I SEE TWO CATS.', he: 'אני רואה שני חתולים.', picture: items(2, 'cat', 'orange') },
     english: 'TWO',
     hebrew: 'שתיים',
@@ -302,6 +314,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'three',
+    kosmoMixesUp: 'two',
     example: { en: 'I HAVE THREE RED BALLS.', he: 'יש לי שלושה כדורים אדומים.', picture: items(3, 'ball', 'red') },
     kosmoSpelling: 'TRI',
     english: 'THREE',
@@ -323,6 +336,7 @@ export const WORDS: WordDef[] = [
   // ------------------------------ Unit 3 ---------------------------------
   {
     id: 'key',
+    kosmoMixesUp: 'door',
     kosmoSpelling: 'KI',
     english: 'KEY',
     hebrew: 'מפתח',
@@ -340,6 +354,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'door',
+    kosmoMixesUp: 'key',
     kosmoSpelling: 'DOR',
     english: 'DOOR',
     hebrew: 'דלת',
@@ -357,6 +372,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'open',
+    kosmoMixesUp: 'close',
     kosmoSpelling: 'OUPEN',
     english: 'OPEN',
     hebrew: 'לפתוח',
@@ -398,6 +414,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'close',
+    kosmoMixesUp: 'open',
     english: 'CLOSE',
     hebrew: 'לסגור',
     sayItHe: 'קְלוֹז',
@@ -457,6 +474,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'star',
+    kosmoMixesUp: 'car',
     example: { en: 'I SEE A BIG YELLOW STAR.', he: 'אני רואה כוכב צהוב גדול.', picture: item('star', 'yellow', 'big') },
     english: 'STAR',
     hebrew: 'כוכב',
@@ -496,6 +514,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'on',
+    kosmoMixesUp: 'under',
     example: { en: 'THE CAT IS ON THE TABLE.', he: 'החתול על השולחן.', picture: placed('cat', 'orange', 'on') },
     english: 'ON',
     hebrew: 'על',
@@ -514,6 +533,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'under',
+    kosmoMixesUp: 'on',
     example: { en: 'THE DOG IS UNDER THE TABLE.', he: 'הכלב מתחת לשולחן.', picture: placed('dog', 'white', 'under') },
     english: 'UNDER',
     hebrew: 'מתחת',
@@ -546,6 +566,7 @@ export const WORDS: WordDef[] = [
   },
   {
     id: 'in',
+    kosmoMixesUp: 'on',
     example: { en: 'THE KEY IS IN THE BOX.', he: 'המפתח בתוך הקופסה.', picture: placed('key', 'yellow', 'in') },
     english: 'IN',
     hebrew: 'בתוך',

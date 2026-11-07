@@ -1,15 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { MissionDef, MissionStepDef, UnitDef } from '../../engine/types';
+import { useEffect, useRef, useState } from 'react';
+import type { KosmoSource, MissionDef, MissionStepDef, SaveData, UnitDef } from '../../engine/types';
 import { inLevel } from '../../content/levels';
 import { levelOfGame } from '../../engine/gameProgress';
 import { ItemArt } from '../../components/ItemArt';
-import { AlienStage, BigButton, EnglishWord } from '../../components/ui';
+import { AlienStage, BigButton, EnglishWord, OptionCard } from '../../components/ui';
 import { IconArrowLeft, IconLock } from '../../components/Icons';
 import { MISSIONS_BY_ID, UNITS_BY_ID, unitWordIds } from '../../content/units';
 import { item } from '../../content/items';
 import { buildMissionQuestion } from '../../engine/tasks';
 import { completeUnit } from '../../engine/gameProgress';
-import { needsPractice } from '../../engine/learning';
+import { isDueForReview, needsPractice } from '../../engine/learning';
+import { guessLabelHe } from '../../engine/alienMind';
+import { kosmoLearns, kosmoUsedRight, planMissionStep, type MissionPlan } from '../../engine/kosmo';
+import { initialSupport } from '../../engine/hints';
+import { recordDelayedReview, recordWordAttempt } from '../../engine/session';
+import type { QuestionInstance } from '../../engine/tasks';
 import { getWord, WORDS_BY_ID } from '../../content/words';
 import { useGame, now } from '../../state/GameContext';
 import { playSfx } from '../../audio/sfx';
@@ -21,7 +26,7 @@ const SCENE_TITLE: Record<MissionDef['scene'], string> = {
   door: 'הדרך לחדר הבקרה',
 };
 
-export function MissionScene({ m, steps, doneCount, finished = false }: { m: MissionDef; steps: MissionStepDef[]; doneCount: number; finished?: boolean }) {
+export function MissionScene({ m, steps, doneCount, finished = false, solo }: { m: MissionDef; steps: MissionStepDef[]; doneCount: number; finished?: boolean; solo?: number }) {
   const done = steps.slice(0, doneCount);
   const collect = steps.filter((s) => s.effect.type === 'collect');
   const stateStep = [...done].reverse().find((s) => s.effect.type === 'state');
@@ -31,8 +36,15 @@ export function MissionScene({ m, steps, doneCount, finished = false }: { m: Mis
     <div className="card p-3 sm:p-4" data-testid="mission-scene" data-done={doneCount} data-door={m.scene === 'door' ? doorState : undefined}>
       <div className="flex items-center justify-between mb-2">
         <p className="font-extrabold text-lg">{SCENE_TITLE[m.scene]}</p>
-        <p className="text-sm font-bold text-ink-soft">
-          {doneCount}/{steps.length}
+        <p className="text-sm font-bold text-ink-soft flex items-center gap-3">
+          {solo !== undefined && (
+            <span className="rounded-full bg-good-bg border-2 border-good text-good px-2 py-0.5" data-testid="kosmo-solo" data-solo={solo} title="פעמים שקוסמו עשה לבד, בזכות מה שלימדתם אותו">
+              🤖 קוסמו לבד: {solo}
+            </span>
+          )}
+          <span>
+            {doneCount}/{steps.length}
+          </span>
         </p>
       </div>
       <div className="flex items-end gap-3">
@@ -89,8 +101,8 @@ export function PlayStep({ missionId, unit, onDone, onGoToStep }: { missionId: s
   const [steps] = useState(() => m.steps.filter((s) => inLevel(s.minLevel, level)));
   const [i, setI] = useState(0);
   const [phase, setPhase] = useState<'intro' | 'steps' | 'done'>('intro');
+  const [solo, setSolo] = useState(0);
   const hasAbility = !m.requiredAbility || data.alien.abilities.includes(m.requiredAbility);
-  const q = useMemo(() => buildMissionQuestion(steps[i], { variant: i + data.attempts.length, taskId: `${m.id}:${steps[i].id}` }), [i]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (phase !== 'done') return;
@@ -132,6 +144,9 @@ export function PlayStep({ missionId, unit, onDone, onGoToStep }: { missionId: s
             </span>
           ))}
         </div>
+        <p className="text-center font-bold" data-testid="mission-how">
+          🤖 קוסמו ינסה לבד את מה שלימדתם אותו — ואתם תבדקו אותו. מה שעוד לא לימדתם, הוא יבקש שתראו לו.
+        </p>
         <div className="flex justify-end">
           <BigButton variant="teal" onClick={() => setPhase('steps')} testId="next-btn">
             יוצאים למשימה! 🚀
@@ -143,8 +158,11 @@ export function PlayStep({ missionId, unit, onDone, onGoToStep }: { missionId: s
   if (phase === 'done')
     return (
       <div className="flex flex-col gap-4" data-testid="mission-done">
-        <AlienStage mood="success" text={`הצלחנו! ${m.rewardHe} תודה שעזרתם לי.`} />
-        <MissionScene m={m} steps={steps} doneCount={steps.length} finished />
+        <AlienStage
+          mood="success"
+          text={`הצלחנו! ${m.rewardHe} ${solo ? `${solo} ${solo === 1 ? 'פעם' : 'פעמים'} מתוך ${steps.length} עשיתי לבד — בזכות מה שלימדתם אותי!` : 'תודה שלימדתם אותי — בפעם הבאה אנסה לבד.'}`}
+        />
+        <MissionScene m={m} steps={steps} doneCount={steps.length} finished solo={solo} />
         <div className="flex justify-end">
           <BigButton onClick={onDone} testId="next-btn">
             המשך <IconArrowLeft size={24} />
@@ -154,22 +172,181 @@ export function PlayStep({ missionId, unit, onDone, onGoToStep }: { missionId: s
     );
 
   const step = steps[i];
-  const ask = step.effect.type === 'collect' ? `אני צריך: ${step.promptEn}. איזה מהם לקחת?` : `${step.promptEn}! איך זה צריך להיראות אחרי?`;
   return (
-    <div className="flex flex-col gap-3" data-testid="mission-step" data-step={step.id}>
-      <MissionScene m={m} steps={steps} doneCount={i} />
-      <ChoiceQuestion
-        question={q}
-        phase="learn"
-        askLine={ask}
-        successLine={() => step.doneHe}
-        onComplete={() => {
+    <div className="flex flex-col gap-3" data-testid="mission-step" data-step={step.id} data-prompt={step.promptEn}>
+      <MissionScene m={m} steps={steps} doneCount={i} solo={solo} />
+      <MissionStepView
+        key={step.id}
+        m={m}
+        step={step}
+        variant={i + data.attempts.length}
+        last={i + 1 >= steps.length}
+        onAlone={() => setSolo((n) => n + 1)}
+        onDone={() => {
           if (i + 1 >= steps.length) setPhase('done');
           else setI(i + 1);
         }}
-        continueLabel={i + 1 >= steps.length ? 'סיום המשימה' : 'הבא'}
       />
     </div>
+  );
+}
+
+// ---------------------------- One mission step -------------------------------
+// Kosmo tries first, using ONLY what the child taught him (engine/kosmo.ts).
+// The child checks him. A wrong try has a visible consequence in the world and
+// the child shows him the right one — that example becomes his knowledge, so
+// next time (here, in later missions and stations) he can do it alone.
+
+const FAIL_HE: Record<MissionDef['scene'], string> = {
+  supply: 'ארגז האספקה לא מקבל את זה — זה לא מה שביקשו! 📦🚫',
+  colors: 'מכונת הצבעים מצפצפת: 🚫 זה לא מה שהיא צריכה!',
+  door: 'אוי, זה לא עבד — שום דבר לא זז! 🚪🚫',
+};
+
+function askLineFor(plan: MissionPlan, step: MissionStepDef, afterWrong: boolean): string {
+  const req = step.promptEn;
+  if (afterWrong) return `נכון, טעיתי! 😅 איזה מהם הוא ${req}? תראו לי, ואזכור.`;
+  if (plan.mode === 'asks') {
+    const w = plan.wordId ? WORDS_BY_ID[plan.wordId]?.english : req;
+    if (plan.reason === 'fading') return `${req}... את ${w} לימדתם אותי, אבל שכחתי! 😅 תזכירו לי — איזה מהם?`;
+    if (plan.reason === 'lookalike' && plan.lookAlike) return `${req}? את ${WORDS_BY_ID[plan.lookAlike].english} אני מכיר — ו-${w} זה משהו אחר! תראו לי איזה מהם?`;
+    if (plan.reason === 'unsure') return `${req}? אני לא בטוח איזה מהם. תראו לי?`;
+    return `אני צריך: ${req}. את ${w} עוד לא לימדו אותי — תראו לי איזה מהם?`;
+  }
+  return step.effect.type === 'collect' ? `אני צריך: ${req}. איזה מהם לקחת?` : `${req}! איך זה צריך להיראות אחרי?`;
+}
+
+/** Kosmo's reaction to being shown the answer (computed on the current data, before it is saved). */
+function learnReaction(d: SaveData, step: MissionStepDef, source: KosmoSource): string {
+  for (const w of step.wordIds) {
+    const r = kosmoLearns(d, w, step.answer, source, now());
+    const target = WORDS_BY_ID[w].target;
+    if (r.effect === 'resolved' && r.before && (r.before.dim !== target.dim || r.before.value !== target.value))
+      return `אהה! 💡 חשבתי ש-${WORDS_BY_ID[w].english} זה ${guessLabelHe(r.before)}. עכשיו הבנתי: ${WORDS_BY_ID[w].english} זה ${guessLabelHe(target)}!`;
+  }
+  if (source === 'remind') return 'עכשיו נזכרתי! תודה.';
+  return `למדתי: ${step.promptEn}! בפעם הבאה אנסה לבד.`;
+}
+
+function MissionStepView({ m, step, variant, last, onAlone, onDone }: { m: MissionDef; step: MissionStepDef; variant: number; last: boolean; onAlone: () => void; onDone: () => void }) {
+  const { data, update } = useGame();
+  const [q] = useState(() => buildMissionQuestion(step, { variant, taskId: `${m.id}:${step.id}` }));
+  const [plan] = useState<MissionPlan>(() => planMissionStep(data, step.wordIds, q.options, now()));
+  const [dueAtStart] = useState(() => new Set(step.wordIds.filter((w) => isDueForReview(data.learning[w], now()))));
+  const [stage, setStage] = useState<'kosmo' | 'child' | 'done'>(plan.mode === 'tries' ? 'kosmo' : 'child');
+  const [kosmoWasWrong, setKosmoWasWrong] = useState(false);
+  const [line, setLine] = useState(() =>
+    plan.mode === 'tries'
+      ? plan.mixedWith
+        ? `${step.promptEn}? את זה עוד לא לימדו אותי, אבל זה נשמע לי כמו ${WORDS_BY_ID[plan.mixedWith].english}... אז אני חושב שזה זה 👉 צדקתי?`
+        : `${step.promptEn}? את זה לימדתם אותי! אני חושב שזה זה 👉 צדקתי?`
+      : askLineFor(plan, step, false),
+  );
+  const [alone, setAlone] = useState(false);
+  const busy = useRef(false);
+  const childQ: QuestionInstance = plan.mode === 'tries' && kosmoWasWrong ? { ...q, options: q.options.filter((_, i) => i !== plan.pick) } : q;
+
+  function recordJudgment(d: SaveData, ok: boolean): SaveData {
+    return step.wordIds.reduce(
+      (acc, w) =>
+        recordWordAttempt(acc, {
+          wordId: w,
+          taskId: `${m.id}:${step.id}:check`,
+          taskType: 'check_alien',
+          outcome: ok ? 'correct' : 'wrong',
+          attemptNumber: 1,
+          // Confirming what Kosmo showed is success WITH support, never "independent".
+          support: ok ? { ...initialSupport, used: ['shown_by_kosmo'] } : initialSupport,
+          completed: ok,
+          phase: 'learn',
+          context: 'new',
+          now: now(),
+        }),
+      d,
+    );
+  }
+
+  function judge(saysRight: boolean) {
+    if (plan.mode !== 'tries' || stage !== 'kosmo' || busy.current) return;
+    busy.current = true;
+    setTimeout(() => (busy.current = false), 450);
+    if (plan.correct) {
+      update((d) => kosmoUsedRight(saysRight ? recordJudgment(d, true) : recordJudgment(d, false), step.wordIds, now()));
+      playSfx(saysRight ? 'correct' : 'pop');
+      setAlone(true);
+      onAlone();
+      setStage('done');
+      setLine(saysRight ? `יש! עשיתי את זה לבד — בזכות מה שלימדתם אותי 🎉 ${step.doneHe}` : `דווקא צדקתי! 😄 ${step.promptEn} — ${step.promptHe}. לימדתם אותי את זה קודם. ${step.doneHe}`);
+      return;
+    }
+    setKosmoWasWrong(true);
+    if (saysRight) {
+      // The child accepted Kosmo's mistake: the world shows it did not work.
+      update((d) => recordJudgment(d, false));
+      playSfx('tryAgain');
+      setLine(`${FAIL_HE[m.scene]} ${askLineFor(plan, step, true)}`);
+    } else {
+      playSfx('pop');
+      setLine(askLineFor(plan, step, true));
+    }
+    setStage('child');
+  }
+
+  if (stage === 'kosmo' || (stage === 'done' && alone)) {
+    const pick = plan.mode === 'tries' ? plan.pick : -1;
+    return (
+      <div className="flex flex-col gap-4" data-testid="mission-kosmo" data-kosmo-correct={plan.mode === 'tries' && plan.correct ? 'true' : 'false'} data-stage={stage}>
+        <AlienStage mood={stage === 'done' ? 'success' : 'curious'} text={line} />
+        <div className="card px-4 py-3 flex items-center justify-center gap-3 flex-wrap">
+          <EnglishWord text={step.promptEn} size="lg" />
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="kosmo-options">
+          {q.options.map((o, i) => (
+            <OptionCard key={o.key} option={o} state={i === pick ? (stage === 'done' ? 'correct' : 'alien') : 'idle'} onClick={() => {}} disabled caption={i === pick ? '👽 קוסמו בחר' : undefined} />
+          ))}
+        </div>
+        {stage === 'kosmo' ? (
+          <div className="grid grid-cols-2 gap-3">
+            <button type="button" className="btn btn-soft !text-xl !min-h-[64px]" onClick={() => judge(true)} data-testid="kosmo-right">
+              ✅ צדקת, קוסמו
+            </button>
+            <button type="button" className="btn btn-soft !text-xl !min-h-[64px]" onClick={() => judge(false)} data-testid="kosmo-wrong">
+              ❌ טעית
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-end">
+            <BigButton onClick={onDone} testId="next-btn">
+              {last ? 'סיום המשימה' : 'הבא'} <IconArrowLeft size={24} />
+            </BigButton>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const source: KosmoSource = kosmoWasWrong ? 'fix' : plan.mode === 'asks' && plan.reason === 'fading' ? 'remind' : 'show';
+  return (
+    <ChoiceQuestion
+      key={kosmoWasWrong ? 'after-kosmo' : 'ask'}
+      question={childQ}
+      phase="learn"
+      askLine={line}
+      successLine={() => `${step.doneHe} ${learnReaction(data, step, source)}`}
+      onComplete={(r) => {
+        const t = now();
+        update((d) => {
+          let out = d;
+          for (const w of step.wordIds) {
+            out = kosmoLearns(out, w, step.answer, source, t).data;
+            if (dueAtStart.has(w)) out = recordDelayedReview(out, w, r.firstTryCorrect, r.anyHint, true, t);
+          }
+          return out;
+        });
+        onDone();
+      }}
+      continueLabel={last ? 'סיום המשימה' : 'הבא'}
+    />
   );
 }
 

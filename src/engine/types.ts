@@ -110,6 +110,11 @@ export interface WordDef {
   example?: { en: string; he: string; picture: ItemSpec };
   /** Levels 2–3 spelling: how Kosmo writes the word "by its sound" (a typical Hebrew-speaker spelling mistake). */
   kosmoSpelling?: string;
+  /**
+   * The look-alike word Kosmo confuses this word with until the child teaches him (e.g. CAT ↔ DOG, ON ↔ UNDER).
+   * Missing = no natural look-alike: Kosmo asks the child instead.
+   */
+  kosmoMixesUp?: string;
 }
 
 export interface SentenceDef {
@@ -159,19 +164,19 @@ export interface MixupRoundDef {
   picture: ItemSpec;
   /** For an action (OPEN / CLOSE): the state before, shown with an arrow. */
   pictureFrom?: ItemSpec;
-  /** What Kosmo says, word by word. */
+  /** The CORRECT sentence, word by word. */
   tokens: string[];
-  /** Index of Kosmo's wrong word. Missing = Kosmo is right this time. */
-  wrongAt?: number;
-  /** The right word for that place. */
-  fix?: string;
-  /** Replacement choices (including the fix); every other choice does not fit. */
-  choices?: string[];
+  /** Index of the word Kosmo has to get right. What he says there comes from his knowledge. */
+  focusAt: number;
+  /** Game word id (or grammar pseudo-word such as 'are') behind tokens[focusAt]. */
+  focus: string;
+  /** Choices for that place (including the right word); every other choice does not fit. */
+  choices: string[];
   /** Hebrew of the correct sentence. */
   hebrew: string;
   /** What to look at — the first hint. */
   tipHe: string;
-  /** Game words of this unit that the round checks. */
+  /** Game words of this unit whose learning data the round records. */
   wordIds: string[];
 }
 
@@ -263,7 +268,8 @@ export interface MissionDef {
 
 // ------------------------------- Support ----------------------------------
 
-export type HintType = 'verbal' | 'reduce' | 'highlight' | 'demo';
+/** 'shown_by_kosmo': Kosmo showed an answer and the child only confirmed it — counts as success with support. */
+export type HintType = 'verbal' | 'reduce' | 'highlight' | 'demo' | 'shown_by_kosmo';
 
 // ------------------------------ Learning ----------------------------------
 
@@ -345,9 +351,29 @@ export interface ConceptKnowledge {
   understoodAt?: number;
 }
 
+/** How the child taught Kosmo a word. */
+export type KosmoSource = 'teach' | 'show' | 'fix' | 'remind';
+
+/** Kosmo's memory of a word: who taught it and how he used it since (what he knows lives in `concepts`). */
+export interface KosmoWord {
+  first: KosmoSource;
+  firstAt: number;
+  lastAt: number;
+  /** Times the child showed / corrected / reminded Kosmo. */
+  shown: number;
+  fixed: number;
+  reminded: number;
+  /** Times Kosmo then used the word right by himself. */
+  usedRight: number;
+  /** Grammar pseudo-words (e.g. ARE) have no picture meaning: Kosmo simply knows them or not. */
+  knows?: boolean;
+}
+
 export interface AlienKnowledge {
   concepts: Record<string, ConceptKnowledge>;
   abilities: string[];
+  /** Kosmo's word memory, built only by the child's teaching. */
+  lexicon: Record<string, KosmoWord>;
 }
 
 // ----------------------------- Game progress ------------------------------

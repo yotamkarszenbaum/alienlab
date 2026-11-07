@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Page, TopBar } from '../components/ui';
 import { UNITS_BY_ID } from '../content/units';
 import { inLevel } from '../content/levels';
@@ -14,12 +14,16 @@ import { BuildStep } from './steps/BuildStep';
 import { FillStep } from './steps/FillStep';
 import { ReadStep } from './steps/ReadStep';
 import { MixupStep } from './steps/MixupStep';
+import { MAX_REMINDERS, ReminderStep } from './steps/ReminderStep';
+import { dueWords } from '../engine/session';
 
 export function UnitScreen({ unitId }: { unitId: string }) {
   const { data, update } = useGame();
   const { go } = useNav();
   const unit = UNITS_BY_ID[unitId];
   const unlocked = unit && isUnitUnlocked(data.game, unitId);
+  // Words due for a delayed review when entering the station: Kosmo asks for a reminder first.
+  const [reminders, setReminders] = useState(() => dueWords(data, now()).slice(0, MAX_REMINDERS));
 
   useEffect(() => {
     if (!unit || !unlocked) {
@@ -43,7 +47,9 @@ export function UnitScreen({ unitId }: { unitId: string }) {
   const goToStep = (stepId: string) => update((d) => ({ ...d, game: reopenStep(d.game, unit.id, stepId) }));
 
   let body;
-  switch (step.type) {
+  const reminding = reminders.length > 0 && step.type !== 'summary';
+  if (reminding) body = <ReminderStep words={reminders} onDone={() => setReminders([])} />;
+  else switch (step.type) {
     case 'discover':
       body = <DiscoverStep key={step.id} wordId={step.wordId} onDone={next} />;
       break;
@@ -111,7 +117,7 @@ export function UnitScreen({ unitId }: { unitId: string }) {
     <>
       <TopBar onHome={() => go({ name: 'lab' })} title={unit.titleHe} progress={{ current: idx, total: steps.length }} />
       <Page>
-        <div data-testid="unit-screen" data-unit={unit.id} data-step={step.id} data-step-type={step.type} data-level={level}>
+        <div data-testid="unit-screen" data-unit={unit.id} data-step={reminding ? 'reminder' : step.id} data-step-type={reminding ? 'reminder' : step.type} data-level={level}>
           {body}
         </div>
       </Page>

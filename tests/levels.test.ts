@@ -8,8 +8,9 @@ import { introduceWord, recordWordAttempt } from '../src/engine/session';
 import { levelOf } from '../src/engine/learning';
 import { newSave } from '../src/engine/storage';
 import { buildMissionQuestion, buildPictureToWord, buildSceneQuestion, buildWordToPicture } from '../src/engine/tasks';
-import { hasFeature } from '../src/engine/alienMind';
-import type { Level } from '../src/engine/types';
+import { applyMixupRound, GRAMMAR, inflectLike, kosmoLearns, kosmoUsedRight, planMissionStep, planMixup } from '../src/engine/kosmo';
+import { hasFeature, understandingOf } from '../src/engine/alienMind';
+import type { Level, MixupRoundDef } from '../src/engine/types';
 
 const T0 = 1_800_000_000_000;
 /** Does a picture show a word? (an item's own features, or the table/box it sits on/in) */
@@ -179,36 +180,37 @@ describe('levels — "Kosmo gets confused" (levels 2–3)', () => {
     expect(ids(1).some((x) => x.endsWith('-kosmo') || x.endsWith('-mixup'))).toBe(false);
   });
 
-  it('every round is consistent: the wrong word does not fit the picture, the fix does, other choices do not', () => {
+  it('every round is consistent: the sentence fits the picture, Kosmo\'s look-alike and the other choices do not', () => {
     for (const u of UNITS)
       for (const s of u.steps)
         if (s.type === 'mixup')
           for (const r of s.rounds) {
             const tag = `${s.id}/${r.id}`;
-            const wrong = r.wrongAt !== undefined;
-            expect(wrong, `${tag}: fix and choices go with a wrong word`).toBe(!!r.fix && !!r.choices);
-            r.tokens.forEach((t, i) => {
+            r.tokens.forEach((t) => {
               const w = gameWord(t);
-              if (!w) return;
-              expect(shows(r.picture, w.id), `${tag}: "${t}" ${i === r.wrongAt ? 'must not' : 'must'} fit the picture`).toBe(i !== r.wrongAt);
+              if (w) expect(shows(r.picture, w.id), `${tag}: "${t}" must fit the picture`).toBe(true);
             });
-            if (wrong) {
-              expect(r.wrongAt! < r.tokens.length).toBe(true);
-              expect(r.choices).toContain(r.fix);
-              expect(r.choices).not.toContain(r.tokens[r.wrongAt!]);
-              expect(new Set(r.choices).size).toBe(r.choices!.length);
-              expect(r.choices!.length).toBeGreaterThanOrEqual(2);
-              for (const c of r.choices!) {
-                const w = gameWord(c);
-                if (w) expect(shows(r.picture, w.id), `${tag}: choice ${c}`).toBe(c === r.fix);
-              }
+            const right = r.tokens[r.focusAt];
+            if (GRAMMAR[r.focus]) expect(right).toBe(GRAMMAR[r.focus].token);
+            else expect(gameWord(right)?.id, `${tag}: focus`).toBe(r.focus);
+            expect(r.choices).toContain(right);
+            expect(new Set(r.choices).size).toBe(r.choices.length);
+            for (const c of r.choices) {
+              const w = gameWord(c);
+              if (w && c !== right) expect(shows(r.picture, w.id), `${tag}: choice ${c}`).toBe(false);
+            }
+            const mix = GRAMMAR[r.focus]?.mixToken ?? (WORDS_BY_ID[r.focus].kosmoMixesUp ? inflectLike(WORDS_BY_ID[WORDS_BY_ID[r.focus].kosmoMixesUp!].english, right, WORDS_BY_ID[r.focus].english) : null);
+            if (mix) {
+              expect(r.choices, `${tag}: Kosmo's look-alike is not a choice`).not.toContain(mix);
+              const mw = gameWord(mix);
+              if (mw) expect(shows(r.picture, mw.id), `${tag}: look-alike ${mix} must not fit`).toBe(false);
             }
             for (const w of r.wordIds) expect(u.wordIds, `${tag}: ${w} is a word of this station`).toContain(w);
             if (r.pictureFrom) expect(r.pictureFrom.state).not.toBe(r.picture.state);
           }
   });
 
-  it('Kosmo only uses words the child already knows at that level', () => {
+  it('Kosmo only uses words the child already knows at that level (incl. his look-alikes)', () => {
     for (const level of [2, 3] as Level[])
       for (const u of UNITS) {
         const seen = new Set<string>(UNITS.filter((p) => p.order < u.order).flatMap((p) => unitWordIds(p, level)));
@@ -226,24 +228,77 @@ describe('levels — "Kosmo gets confused" (levels 2–3)', () => {
             }
           }
           if (s.type !== 'mixup') continue;
-          for (const r of s.rounds.filter((r) => inRange(r.minLevel, r.maxLevel, level)))
-            for (const t of [...r.tokens, ...(r.choices ?? [])]) {
+          for (const r of s.rounds.filter((r) => inRange(r.minLevel, r.maxLevel, level))) {
+            const mixId = WORDS_BY_ID[r.focus]?.kosmoMixesUp;
+            for (const t of [...r.tokens, ...r.choices, ...(mixId ? [WORDS_BY_ID[mixId].english] : [])]) {
               const w = gameWord(t);
               if (w) expect(known(w.id), `${s.id}/${r.id} uses ${w.id} (level ${level})`).toBe(true);
             }
+          }
         }
       }
   });
 
-  it('the opening covers every basic word of the station, with a mix of right and wrong rounds', () => {
+  /** Play every station at a level with a child who answers well, through Kosmo's real knowledge rules. */
+  function simulate(level: Level) {
+    let d = newSave(T0);
+    d = { ...d, game: setLevel(d.game, level) };
+    const modes: Record<string, string[]> = {};
+    const beforeTeach: Record<string, string> = {};
+    for (const u of UNITS)
+      for (const s of stepsFor(u, level)) {
+        if (s.type === 'mixup') {
+          modes[s.id] = [];
+          for (const r of s.rounds.filter((r) => inRange(r.minLevel, r.maxLevel, level))) {
+            const p = planMixup(d, r, T0);
+            modes[s.id].push(`${r.focus}:${p.mode}`);
+            d = applyMixupRound(d, r, { perfect: true, caught: true, plan: p }, initialSupport, s.id, T0);
+          }
+        }
+        if (s.type === 'teach') {
+          const w = WORDS_BY_ID[s.conceptId];
+          beforeTeach[s.conceptId] = understandingOf(w.target, d.alien.concepts[s.conceptId]);
+          for (const ex of w.teach!.pool.filter((i) => hasFeature(i, w.target))) {
+            if (understandingOf(w.target, d.alien.concepts[s.conceptId]) === 'understood') break;
+            d = kosmoLearns(d, s.conceptId, ex, 'teach', T0).data;
+          }
+        }
+        if (s.type === 'play')
+          for (const ms of MISSIONS_BY_ID[s.missionId].steps.filter((x) => inLevel(x.minLevel, level))) {
+            const q = buildMissionQuestion(ms, { variant: 0, taskId: 't' });
+            const p = planMissionStep(d, ms.wordIds, q.options, T0);
+            for (const w of ms.wordIds) d = p.mode === 'tries' && p.correct ? kosmoUsedRight(d, [w], T0) : kosmoLearns(d, w, ms.answer, 'show', T0).data;
+          }
+      }
+    return { modes, beforeTeach, d };
+  }
+
+  it('in a real playthrough every opening has a mistake to catch and a time Kosmo uses what he was taught', () => {
+    for (const level of [2, 3] as Level[]) {
+      const { modes } = simulate(level);
+      for (const u of UNITS) {
+        const m = modes[`${u.id}-mixup`];
+        expect(m.some((x) => x.endsWith(':wrong')), `${u.id} L${level}: ${m.join(' ')}`).toBe(true);
+        expect(m.some((x) => x.endsWith(':right')), `${u.id} L${level}: ${m.join(' ')}`).toBe(true);
+        expect(m.some((x) => x.endsWith(':gap')), `${u.id} L${level}: ${m.join(' ')}`).toBe(true);
+      }
+    }
+  });
+
+  it('the mix-ups never solve a concept that has its own "teach Kosmo" step later in the station', () => {
+    for (const level of [2, 3] as Level[]) {
+      const { beforeTeach } = simulate(level);
+      for (const [c, u] of Object.entries(beforeTeach)) expect(u, `${c} at level ${level}`).not.toBe('understood');
+    }
+  });
+
+  it('the opening covers every basic word of the station', () => {
     for (const level of [2, 3] as Level[])
       for (const u of UNITS) {
-        const opening = stepsFor(u, level)[0] as { rounds: import('../src/engine/types').MixupRoundDef[] };
+        const opening = stepsFor(u, level)[0] as { rounds: MixupRoundDef[] };
         const rounds = opening.rounds.filter((r) => inRange(r.minLevel, r.maxLevel, level));
         const basics = unitWordIds(u, level).filter((w) => (WORDS_BY_ID[w].minLevel ?? 1) < level);
         for (const w of basics) expect(rounds.some((r) => r.wordIds.includes(w)), `${u.id} level ${level}: ${w}`).toBe(true);
-        expect(rounds.some((r) => r.wrongAt === undefined), `${u.id} L${level}: a round where Kosmo is right`).toBe(true);
-        expect(rounds.filter((r) => r.wrongAt !== undefined).length).toBeGreaterThanOrEqual(2);
       }
   });
 

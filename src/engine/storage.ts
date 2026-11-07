@@ -6,7 +6,7 @@
 //  - newer schema versions   -> not overwritten; game runs without saving
 //  - storage not available   -> in-memory mode (progress not saved)
 // ---------------------------------------------------------------------------
-import type { AlienKnowledge, AttemptRecord, ConceptKnowledge, GameProgress, Level, SaveData, Settings, WordProgress } from './types';
+import type { AlienKnowledge, AttemptRecord, ConceptKnowledge, GameProgress, KosmoSource, KosmoWord, Level, SaveData, Settings, WordProgress } from './types';
 import { emptyWordProgress, MAX_ATTEMPT_LOG } from './learning';
 import { emptyAlien, emptyConcept } from './alienMind';
 import { emptyGame } from './gameProgress';
@@ -95,7 +95,23 @@ function normAlien(x: unknown): AlienKnowledge {
   if (!isObj(x)) return a;
   const concepts: Record<string, ConceptKnowledge> = {};
   if (isObj(x.concepts)) for (const [k, v] of Object.entries(x.concepts)) concepts[k] = normConcept(k, v);
-  return { concepts, abilities: strArr(x.abilities) };
+  const lexicon: Record<string, KosmoWord> = {};
+  const sources: KosmoSource[] = ['teach', 'show', 'fix', 'remind'];
+  if (isObj(x.lexicon))
+    for (const [k, v] of Object.entries(x.lexicon)) {
+      if (!isObj(v)) continue;
+      lexicon[k] = {
+        first: sources.includes(v.first as KosmoSource) ? (v.first as KosmoSource) : 'show',
+        firstAt: num(v.firstAt),
+        lastAt: num(v.lastAt),
+        shown: num(v.shown),
+        fixed: num(v.fixed),
+        reminded: num(v.reminded),
+        usedRight: num(v.usedRight),
+        ...(typeof v.knows === 'boolean' ? { knows: v.knows } : {}),
+      };
+    }
+  return { concepts, abilities: strArr(x.abilities), lexicon };
 }
 
 function normGame(x: unknown): GameProgress {

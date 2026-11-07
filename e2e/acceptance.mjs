@@ -78,15 +78,46 @@ function helpers(page) {
     }
   }
 
+  /** One mission step. Kosmo tries first when his knowledge lets him; the child checks him or shows him. */
+  async function missionStep(onKosmo) {
+    const prompt = await page.getAttribute('[data-testid=mission-step]', 'data-prompt');
+    if (await exists('[data-testid=mission-kosmo][data-stage=kosmo]')) {
+      const ok = (await page.getAttribute('[data-testid=mission-kosmo]', 'data-kosmo-correct')) === 'true';
+      const pick = await page.locator('[data-testid=kosmo-options] button:has-text("קוסמו בחר")').first().getAttribute('data-testid');
+      if (onKosmo) await onKosmo({ prompt, ok, pick });
+      await click(ok ? '[data-testid=kosmo-right]' : '[data-testid=kosmo-wrong]');
+      if (ok) {
+        await click('[data-testid=next-btn]');
+        return { prompt, kind: 'alone', pick };
+      }
+      await click('[data-testid=options] button[data-correct=true]');
+      await click('[data-testid=next-btn]');
+      return { prompt, kind: 'kosmo-wrong', pick };
+    }
+    await click('[data-testid=options] button[data-correct=true]');
+    await click('[data-testid=next-btn]');
+    return { prompt, kind: 'asks' };
+  }
+
   async function doMission(onStep) {
     await click('[data-testid=next-btn]'); // intro
-    for (let g = 0; g < 10; g++) {
+    const log = [];
+    for (let g = 0; g < 12; g++) {
       if (await exists('[data-testid=mission-done]')) break;
       if (onStep) await onStep();
+      log.push(await missionStep());
+    }
+    await click('[data-testid=next-btn]');
+    return log;
+  }
+
+  /** Kosmo asks for a reminder when entering a station (spaced retrieval). */
+  async function doReminder() {
+    for (let g = 0; g < 6; g++) {
+      if ((await stepType()) !== 'reminder') return;
       await click('[data-testid=options] button[data-correct=true]');
       await click('[data-testid=next-btn]');
     }
-    await click('[data-testid=next-btn]');
   }
 
   async function doSpell() {
@@ -130,7 +161,7 @@ function helpers(page) {
     }
   }
 
-  /** Kosmo's mix-ups. mode(roundId) → 'right' (answer perfectly) or 'misjudge' (judge Kosmo wrongly first). */
+  /** Kosmo's mix-ups. mode(roundId) → 'right' (answer well) or 'misjudge' (make one mistake first). */
   async function doMixup(mode = () => 'right', onRound) {
     const s0 = await stepId();
     for (let g = 0; g < 14; g++) {
@@ -144,16 +175,22 @@ function helpers(page) {
         continue;
       }
       const rid = await page.getAttribute('[data-testid=mixup-round]', 'data-round');
-      const right = (await page.getAttribute('[data-testid=mixup-round]', 'data-kosmo-right')) === 'true';
+      const kind = await page.getAttribute('[data-testid=mixup-round]', 'data-mode');
       const misjudge = mode(rid) === 'misjudge';
-      await click(right !== misjudge ? '[data-testid=judge-right]' : '[data-testid=judge-wrong]');
-      if ((await page.getAttribute('[data-testid=mixup-round]', 'data-stage')) === 'find') {
-        if (onRound) await onRound(rid, 'find');
-        await click('[data-testid=mixup-sentence] [data-wrong=true]');
-        if (onRound) await onRound(rid, 'fix');
+      if (onRound) await onRound(rid, 'start', kind);
+      if (kind === 'gap') {
+        if (misjudge) await click('[data-testid=mixup-choices] button[data-correct=false]');
         await click('[data-testid=mixup-choices] button[data-correct=true]');
+      } else {
+        await click(kind === 'right' !== misjudge ? '[data-testid=judge-right]' : '[data-testid=judge-wrong]');
+        if ((await page.getAttribute('[data-testid=mixup-round]', 'data-stage')) === 'find') {
+          if (onRound) await onRound(rid, 'find', kind);
+          await click('[data-testid=mixup-sentence] [data-wrong=true]');
+          if (onRound) await onRound(rid, 'fix', kind);
+          await click('[data-testid=mixup-choices] button[data-correct=true]');
+        }
       }
-      if (onRound) await onRound(rid, 'done');
+      if (onRound) await onRound(rid, 'done', kind);
       await click('[data-testid=next-btn]');
     }
   }
@@ -176,10 +213,11 @@ function helpers(page) {
       else if (type === 'fill') await doFill();
       else if (type === 'mixup') await doMixup();
       else if (type === 'play') await doMission();
+      else if (type === 'reminder') await doReminder();
       else if (type === 'summary') return;
     }
   }
-  return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, doBuild, doSpell, doFill, doMixup, playUnit };
+  return { click, save, stepId, stepType, text, exists, overflowX, answerQuestions, doTeach, doMission, missionStep, doReminder, doBuild, doSpell, doFill, doMixup, playUnit };
 }
 
 async function startNewGame(page, h, level = 1) {
@@ -353,7 +391,27 @@ await page.screenshot({ path: SHOTS + 'd08-teach-dog.png', fullPage: true });
 await h.click('[data-testid=teach-pool] button[data-testid="opt-dog.brown.normal.none"]');
 const dogUnderstanding = await page.getAttribute('[data-testid=alien-thought]', 'data-understanding');
 await h.doTeach();
-await h.doMission();
+// ---- First mission: Kosmo tries first, using only what the child taught him
+await h.click('[data-testid=next-btn]'); // mission intro
+const supplyLog = [];
+for (let g = 0; g < 8; g++) {
+  if (await h.exists('[data-testid=mission-done]')) break;
+  supplyLog.push(
+    await h.missionStep(async ({ prompt }) => {
+      if (prompt === 'BALL') await page.screenshot({ path: SHOTS + 'd08b-kosmo-tries.png', fullPage: true });
+    }),
+  );
+}
+const soloSupply = await page.getAttribute('[data-testid=kosmo-solo]', 'data-solo');
+await page.screenshot({ path: SHOTS + 'd08c-mission-done.png', fullPage: true });
+await h.click('[data-testid=next-btn]');
+const sSup = await h.save();
+const logOf = (log, p) => log.find((x) => x.prompt === p);
+note(
+  'משימה: קוסמו מנסה ראשון לפי מה שלימדו אותו',
+  `BALL (לא לימדו): ${logOf(supplyLog, 'BALL')?.kind}, בחר ${logOf(supplyLog, 'BALL')?.pick} (מתבלבל עם APPLE); APPLE: ${logOf(supplyLog, 'APPLE')?.kind} (כבר מכיר BALL, אז שואל); DOG (לימדו בשלב הלימוד): ${logOf(supplyLog, 'DOG')?.kind}; קוסמו לבד: ${soloSupply}; BALL נכנסה למילון: ${sSup.alien.lexicon.ball?.first}`,
+  logOf(supplyLog, 'BALL')?.kind === 'kosmo-wrong' && logOf(supplyLog, 'BALL')?.pick?.startsWith('opt-apple') && logOf(supplyLog, 'APPLE')?.kind === 'asks' && logOf(supplyLog, 'DOG')?.kind === 'alone' && soloSupply === '1' && sSup.alien.lexicon.ball?.first === 'fix',
+);
 await page.waitForSelector('[data-testid=summary-step]');
 await page.screenshot({ path: SHOTS + 'd09-summary.png', fullPage: true });
 const unlockedShown = await h.exists('[data-testid=unlocked-next]');
@@ -428,15 +486,32 @@ await h.playUnit({
   'play-colors': async () => {
     // Test 14: mission combining words from units 1 and 2
     await h.click('[data-testid=next-btn]');
+    // RED APPLE: RED was taught in the teach step, APPLE was shown in the first mission → Kosmo does it alone
+    const kosmoFirst = await h.exists('[data-testid=mission-kosmo][data-stage=kosmo]');
+    const kosmoOk = (await page.getAttribute('[data-testid=mission-kosmo]', 'data-kosmo-correct')) === 'true';
+    const kosmoPick = await page.locator('[data-testid=kosmo-options] button:has-text("קוסמו בחר")').first().getAttribute('data-testid');
+    await page.screenshot({ path: SHOTS + 'd14a-kosmo-alone.png', fullPage: true });
+    await h.click('[data-testid=kosmo-right]');
+    await h.click('[data-testid=next-btn]');
+    const sConf = await h.save();
+    const conf = sConf.attempts.filter((a) => a.taskType === 'check_alien' && a.taskId.startsWith('m-colors'));
+    // BLUE BALL: Kosmo knows RED, so BLUE must be something else → he asks the child (per-word analysis below)
+    const askLine = await h.text('[data-testid=alien-line]');
     const before = await h.save();
-    await h.click('[data-testid=options] button[data-testid="opt-apple.green.normal.none"]');
+    await h.click('[data-testid=options] button[data-testid="opt-ball.red.normal.none"]');
     const after = await h.save();
-    note('ניתוח לפי מילה במשימה משולבת', `בחירת תפוח ירוק ל-RED APPLE: RED שגויים ${before.learning.red.wrong}→${after.learning.red.wrong}, APPLE שגויים ${before.learning.apple.wrong}→${after.learning.apple.wrong}`, after.learning.red.wrong === before.learning.red.wrong + 1 && after.learning.apple.wrong === before.learning.apple.wrong);
+    note('ניתוח לפי מילה במשימה משולבת', `בחירת כדור אדום ל-BLUE BALL: BLUE שגויים ${before.learning.blue.wrong}→${after.learning.blue.wrong}, BALL שגויים ${before.learning.ball.wrong}→${after.learning.ball.wrong}`, after.learning.blue.wrong === before.learning.blue.wrong + 1 && after.learning.ball.wrong === before.learning.ball.wrong);
+    note(
+      'קוסמו עושה לבד את מה שלימדו אותו, ושואל על מה שלא',
+      `RED APPLE: קוסמו ניסה לבד: ${kosmoFirst}, בחר ${kosmoPick}, נכון: ${kosmoOk}; אישור הילד נרשם כ"בתמיכה" (לא עצמאי): ${conf.length > 0 && conf.every((a) => !a.independent && a.hintTypes.includes('shown_by_kosmo'))}; BLUE BALL: "${askLine.replace(/\s+/g, ' ')}"`,
+      kosmoFirst && kosmoOk && kosmoPick === 'opt-apple.red.normal.none' && conf.length > 0 && conf.every((a) => !a.independent && a.hintTypes.includes('shown_by_kosmo')) && askLine.includes('RED'),
+    );
     await page.screenshot({ path: SHOTS + 'd14-mission.png', fullPage: true });
+    await h.click('[data-testid=options] button[data-correct=true]');
+    await h.click('[data-testid=next-btn]');
     for (let g = 0; g < 8; g++) {
       if (await h.exists('[data-testid=mission-done]')) break;
-      await h.click('[data-testid=options] button[data-correct=true]');
-      await h.click('[data-testid=next-btn]');
+      await h.missionStep();
     }
     const done = await h.exists('[data-testid=mission-done]');
     await page.screenshot({ path: SHOTS + 'd15-mission-done.png', fullPage: true });
@@ -458,15 +533,17 @@ await h.playUnit({
   'play-door': async () => {
     await h.click('[data-testid=next-btn]');
     let doorStates = [];
+    const doorLog = [];
     for (let g = 0; g < 8; g++) {
       if (await h.exists('[data-testid=mission-done]')) break;
-      await h.click('[data-testid=options] button[data-correct=true]');
       doorStates.push(await page.getAttribute('[data-testid=mission-scene]', 'data-door'));
-      await h.click('[data-testid=next-btn]');
-      doorStates.push(await page.getAttribute('[data-testid=mission-scene]', 'data-door'));
+      doorLog.push(await h.missionStep());
+      if (await h.exists('[data-testid=mission-scene]')) doorStates.push(await page.getAttribute('[data-testid=mission-scene]', 'data-door'));
     }
     await page.screenshot({ path: SHOTS + 'd17-door-done.png', fullPage: true });
-    note('פעולה במשימה משנה את העולם (דלת)', `מצבי הדלת לאורך המשימה: ${[...new Set(doorStates)].join(' → ')}`, doorStates.includes('open'));
+    note('פעולה במשימה משנה את העולם (דלת)', `מצבי הדלת לאורך המשימה: ${[...new Set(doorStates.filter(Boolean))].join(' → ')}`, doorStates.includes('open'));
+    const rb = doorLog.find((x) => x.prompt === 'RED BALL');
+    note('תיקון של קוסמו משנה את מה שהוא עושה בהמשך', `במשימה הראשונה קוסמו לקח תפוח במקום BALL ותוקן; במשימה השלישית, RED BALL: ${rb?.kind} (בחר ${rb?.pick}); קוסמו לבד במשימה: ${doorLog.filter((x) => x.kind === 'alone').length}/${doorLog.length}`, rb?.kind === 'alone' && rb?.pick === 'opt-ball.red.normal.none');
     await h.click('[data-testid=next-btn]');
   },
 });
@@ -530,6 +607,24 @@ const chip = await h.text('[data-testid=level-chip]');
 const newBadges = await page.locator('[data-testid^=new-words-]').count();
 await page.screenshot({ path: SHOTS + 'd23-lab-level2.png', fullPage: true });
 await h.click('[data-testid=station-earth]');
+// A day has passed (time travel above): words due for review → Kosmo asks for a reminder first.
+let reminderInfo = null;
+if ((await h.stepType()) === 'reminder') {
+  const word = await page.getAttribute('[data-testid=reminder-step]', 'data-word');
+  const shownBefore = await page.locator('[data-testid=reminder-step] [data-testid=options] button[data-correct]').evaluateAll((b) => b.map((x) => x.dataset.testid));
+  const before = await h.save();
+  await page.screenshot({ path: SHOTS + 'd23c-reminder.png', fullPage: true });
+  await h.doReminder();
+  const after = await h.save();
+  reminderInfo = {
+    word,
+    options: shownBefore.length,
+    delayed: after.learning[word].delayedReviews.length - before.learning[word].delayedReviews.length,
+    reminded: after.alien.lexicon[word]?.reminded ?? 0,
+    attempts: after.attempts.filter((a) => a.taskId === `remind:${word}`).length,
+  };
+}
+note('חזרה מרווחת בתוך המשחק: קוסמו מבקש תזכורת', `בכניסה לתחנה אחרי יום: ${reminderInfo ? `מילה ${reminderInfo.word}, ${reminderInfo.options} מילים לבחירה מול תמונה (המילה לא מוצגת מראש); נרשמה חזרה מאוחרת: ${reminderInfo.delayed}; קוסמו "נזכר": ${reminderInfo.reminded}` : 'לא הופיעה'}`, !!reminderInfo && reminderInfo.delayed === 1 && reminderInfo.attempts >= 1 && reminderInfo.reminded >= 1);
 const firstNew = await h.stepId();
 let l2Fill = null;
 let l2Spell = [];
@@ -771,13 +866,16 @@ await h3.playUnit({
     readInfo = { lines, hl, done: s.attempts.filter((a) => a.taskType === 'read' && a.completed).map((a) => a.taskId.split(':')[1]) };
   },
   'teach-under': async () => {
-    await h3.click('[data-testid=teach-pool] button[data-testid="opt-ball.red.normal.none.under-table"]');
+    // In the Kosmo round before, the child corrected "THE BALL IS ON THE TABLE" → Kosmo arrives with UNDER = ball.
+    const g0 = await p3.getAttribute('[data-testid=alien-thought]', 'data-guess');
+    const btn = p3.locator('[data-testid=teach-pool] button[data-testid="opt-ball.red.normal.none.under-table"]');
+    if (await btn.isEnabled()) await h3.click('[data-testid=teach-pool] button[data-testid="opt-ball.red.normal.none.under-table"]');
     const g1 = await p3.getAttribute('[data-testid=alien-thought]', 'data-guess');
     await h3.click('[data-testid=start-test-btn]');
     await p3.waitForSelector('[data-testid=alien-choice]', { timeout: 8000 });
     const choice = await p3.locator('[data-testid=test-scene] button:has([data-testid=alien-choice])').getAttribute('data-testid');
     await p3.screenshot({ path: SHOTS + 'd33-test-under.png', fullPage: true });
-    underInfo = { g1, choice };
+    underInfo = { g0, g1, choice };
     await h3.doTeach();
     const s = await h3.save();
     underInfo.ability = s.alien.abilities.includes('find-places');
@@ -785,7 +883,7 @@ await h3.playUnit({
 });
 note('רמה 3: השלמת משפט עם IN/ON/UNDER', `משפטים: ${fillInfo?.join(', ')}`, !!fillInfo && fillInfo.includes('f3') && fillInfo.includes('f4'));
 note('רמה 3: קריאת הודעה', `שורות בהודעה: ${readInfo?.lines}; אחרי טעות הודגשה שורה ${readInfo?.hl}; שאלות שנענו: ${readInfo?.done.join(', ')}`, readInfo?.lines === 4 && readInfo.hl === '1' && ['q1', 'q2', 'q3'].every((q) => readInfo.done.includes(q)));
-note('רמה 3: קוסמו לומד UNDER', `אחרי "כדור אדום מתחת לשולחן": ${underInfo?.g1}; בבדיקה בחר ${underInfo?.choice}; יכולת "יודע איפה דברים נמצאים": ${underInfo?.ability}`, underInfo?.g1 === 'kind:ball' && underInfo.choice.includes('ball') && !underInfo.choice.includes('under') && underInfo.ability);
+note('רמה 3: קוסמו לומד UNDER', `קוסמו הגיע לשלב הלימוד עם ההשערה מהסבב הקודם ("THE BALL IS UNDER THE TABLE"): ${underInfo?.g0}; אחרי "כדור אדום מתחת לשולחן": ${underInfo?.g1}; בבדיקה בחר ${underInfo?.choice}; יכולת "יודע איפה דברים נמצאים": ${underInfo?.ability}`, underInfo?.g0 === 'kind:ball' && underInfo?.g1 === 'kind:ball' && underInfo.choice.includes('ball') && !underInfo.choice.includes('under') && underInfo.ability);
 await h3.click('[data-testid=back-to-lab]');
 note('רמה 3: מילים נוספות ביחידה 1', `שלבים ששוחקו כוללים: ${['earth-mixup', 'cup-discover', 'earth-kosmo', 'earth-spell'].filter((x) => seen3.includes(x)).join(', ')}; מילים מוכרות דולגו: ${!seen3.includes('apple-discover') && !seen3.includes('car-discover')}; מילים שנחשפו ביחידה: ${['apple', 'ball', 'cat', 'dog', 'car', 'hat', 'cup'].filter((w) => s3.learning[w].introduced).length}/7`, ['earth-mixup', 'cup-discover', 'earth-kosmo', 'earth-spell'].every((x) => seen3.includes(x)) && !seen3.includes('apple-discover') && !seen3.includes('earth-mix'));
 note('רמה 3: הרכבת מילה ארוכה מאותיות + רמז', `מילה: ${spellInfo?.target}; אחרי הרכבה שגויה: רמז ברמה ${spellInfo?.hintLevel}, אותיות ירוקות שנשארו: ${spellInfo?.greenKept}; סיום: "${spellInfo?.doneLine}"`, spellInfo?.hintLevel === '1' && spellInfo.greenKept === spellInfo.target.length - 1);
@@ -822,16 +920,16 @@ await hw.click('[data-testid=station-earth]');
 const firstStep = await hw.stepId();
 await pw.screenshot({ path: SHOTS + 'd34-mixup.png', fullPage: true });
 let mixHint = '';
-const roundsSeen = [];
+const modes = {};
 await hw.doMixup(
-  (rid) => (rid === 'e2-4' ? 'misjudge' : 'right'),
-  async (rid, stage) => {
-    if (stage === 'find' && !roundsSeen.includes(rid)) {
-      roundsSeen.push(rid);
-      if (rid === 'e2-4') mixHint = await hw.text('[data-testid=alien-line]');
-    }
-    if (stage === 'fix' && rid === 'e2-1') await pw.screenshot({ path: SHOTS + 'd35-mixup-fix.png', fullPage: true });
-    if (stage === 'done' && rid === 'e2-4') await pw.screenshot({ path: SHOTS + 'd36-mixup-done.png', fullPage: true });
+  (rid) => (rid === 'e2-1' ? 'misjudge' : 'right'),
+  async (rid, stage, kind) => {
+    modes[rid] = kind;
+    if (stage === 'find' && rid === 'e2-1') mixHint = await hw.text('[data-testid=alien-line]');
+    if (stage === 'fix' && rid === 'e2-2') await pw.screenshot({ path: SHOTS + 'd35-mixup-fix.png', fullPage: true });
+    if (stage === 'start' && rid === 'e2-3') await pw.screenshot({ path: SHOTS + 'd35b-mixup-gap.png', fullPage: true });
+    if (stage === 'done' && rid === 'e2-3') await pw.screenshot({ path: SHOTS + 'd36-mixup-done.png', fullPage: true });
+    if (stage === 'start' && rid === 'e2-5') await pw.screenshot({ path: SHOTS + 'd36b-mixup-right.png', fullPage: true });
   },
 );
 const sW = await hw.save();
@@ -840,8 +938,13 @@ const doneE = sW.game.doneSteps.earth ?? [];
 const mixAttempts = sW.attempts.filter((a) => a.taskType === 'fix_kosmo');
 note(
   '"קוסמו מתבלבל" פותח את התחנה (רמות 2–3)',
-  `שלב ראשון ברמה 2: ${firstStep}; סבבים: ${new Set(mixAttempts.map((a) => a.taskId)).size}; אחרי טעות בשיפוט (CAT): "${mixHint.replace(/\s+/g, ' ').slice(0, 60)}…"; השלב הבא: ${afterMix}; היכרות עם CAT דולגה: ${doneE.includes('cat-discover')}; APPLE דילגה גם על התרגול: ${doneE.includes('apple-practice')}; APPLE נרשמה כזיהוי עצמאי: ${sW.learning.apple.independentCorrect >= 1}`,
-  firstStep === 'earth-mixup' && afterMix === 'cat-practice' && doneE.includes('cat-discover') && !doneE.includes('cat-practice') && doneE.includes('apple-practice') && sW.learning.apple.independentCorrect >= 1 && sW.learning.cat.wrong >= 1 && mixHint.includes('התבלבלתי'),
+  `שלב ראשון ברמה 2: ${firstStep}; סבבים: ${new Set(mixAttempts.map((a) => a.taskId)).size}; אחרי טעות בשיפוט (DOG): "${mixHint.replace(/\s+/g, ' ').slice(0, 50)}…"; השלב הבא: ${afterMix}; ההיכרות עם DOG דולגה: ${doneE.includes('dog-discover')}; APPLE דילגה גם על התרגול: ${doneE.includes('apple-practice')}; APPLE נרשמה כזיהוי עצמאי: ${sW.learning.apple.independentCorrect >= 1}`,
+  firstStep === 'earth-mixup' && afterMix === 'dog-practice' && doneE.includes('dog-discover') && !doneE.includes('dog-practice') && doneE.includes('apple-practice') && sW.learning.apple.independentCorrect >= 1 && sW.learning.dog.wrong >= 1 && mixHint.includes('התבלבלתי'),
+);
+note(
+  'הטעויות של קוסמו נובעות ממה שלימדו אותו, ותיקון משנה את התגובה שלו',
+  `מצבי הסבבים: ${Object.entries(modes).map(([r, k]) => `${r}=${k}`).join(', ')}; אחרי שתיקנו את DOG (e2-1), בסבב e2-5 קוסמו אמר DOG נכון; CAT ו-APPLE הפכו לשאלה כי קוסמו כבר הכיר את DOG ו-BALL; המילון של קוסמו: ${Object.keys(sW.alien.lexicon).join(', ')}`,
+  modes['e2-1'] === 'wrong' && modes['e2-2'] === 'wrong' && modes['e2-3'] === 'gap' && modes['e2-4'] === 'gap' && modes['e2-5'] === 'right' && sW.alien.lexicon.dog?.first === 'fix' && sW.alien.lexicon.dog?.usedRight === 1,
 );
 await hw.click('[data-testid=home-btn]');
 await pw.screenshot({ path: SHOTS + 'd37-after-mixup.png', fullPage: true });
